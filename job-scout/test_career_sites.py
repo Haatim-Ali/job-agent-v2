@@ -94,3 +94,62 @@ class TestQuickFilter:
 
     def test_excluded_company_rejected(self):
         assert not self.qf({"title": "AI Engineer Intern", "company": "Jobright.ai"})[0]
+
+
+class TestClaudeUnavailable:
+    """Regression: when API credits ran out, every job was marked seen as 'rejected' and lost."""
+
+    @pytest.fixture
+    def scraper(self, monkeypatch, tmp_path):
+        import logging
+        monkeypatch.setattr(logging, "basicConfig", lambda **kw: None)
+        import scraper
+        monkeypatch.setattr(scraper, "DB_PATH", str(tmp_path / "jobs.db"))
+        monkeypatch.setattr(scraper, "API_ALERT_MARKER", str(tmp_path / ".last_api_alert"))
+        monkeypatch.setattr(scraper, "_claude_unavailable", None)
+        return scraper
+
+    def _job(self, n):
+        return {"title": f"SWE Intern {n}", "company": f"Co{n}", "job_url": f"https://x/{n}",
+                "description": "Build things.", "site": "greenhouse"}
+
+    def test_credit_error_leaves_jobs_unseen_and_alerts_once(self, scraper, monkeypatch):
+        calls, alerts = [], []
+
+        class FakeMessages:
+            def create(self, **kw):
+                calls.append(1)
+                raise Exception("Error code: 400 - Your credit balance is too low to access the Anthropic API.")
+
+        class FakeClient:
+            def __init__(self, **kw):
+                self.messages = FakeMessages()
+
+        monkeypatch.setattr(scraper.anthropic, "Anthropic", FakeClient)
+        monkeypatch.setattr(scraper, "notify_api_problem", lambda e: alerts.append(e))
+        monkeypatch.setattr(scraper, "send_discord_alert", lambda *a, **k: None)
+        conn = scraper.init_db()
+
+        alerted = scraper.process_jobs([self._job(1), self._job(2), self._job(3)], conn, from_career_site=True)
+
+        assert alerted == 0
+        assert len(calls) == 1          # stops calling Claude after the account error
+        assert len(alerts) == 1
+        for n in (1, 2, 3):
+            assert not scraper.is_seen(conn, f"https://x/{n}")   # kept for retry
+
+    def test_one_off_parse_failure_is_still_marked_seen(self, scraper, monkeypatch):
+        class FakeMessages:
+            def create(self, **kw):
+                class R:
+                    content = [type("C", (), {"text": "not json"})()]
+                return R()
+
+        class FakeClient:
+            def __init__(self, **kw):
+                self.messages = FakeMessages()
+
+        monkeypatch.setattr(scraper.anthropic, "Anthropic", FakeClient)
+        conn = scraper.init_db()
+        scraper.process_jobs([self._job(9)], conn, from_career_site=True)
+        assert scraper.is_seen(conn, "https://x/9")

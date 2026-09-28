@@ -292,7 +292,34 @@ def get_vault_rejection_context():
         return ""
 
 
+# Set when Claude is unreachable (e.g. out of API credits) so the rest of the run
+# skips scoring instead of making calls that are certain to fail.
+_claude_unavailable = None
+API_ALERT_MARKER = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".last_api_alert")
+
+
+def notify_api_problem(error):
+    """Post one Discord warning per day when Claude scoring is failing."""
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    try:
+        if os.path.exists(API_ALERT_MARKER) and open(API_ALERT_MARKER).read().strip() == today:
+            return
+        mention = f"<@{DISCORD_USER_ID}>" if DISCORD_USER_ID else "@here"
+        DiscordWebhook(
+            url=WEBHOOK_URL,
+            content=(f"{mention} ⚠️ Job Scout can't reach Claude, so no jobs are being scored or alerted. "
+                     f"Unscored jobs are kept and retried once it works again.\nError: {str(error)[:300]}"),
+        ).execute()
+        with open(API_ALERT_MARKER, "w") as f:
+            f.write(today)
+    except Exception as e:
+        logging.warning(f"Could not send API problem alert: {e}")
+
+
 def claude_relevance_check(job):
+    global _claude_unavailable
+    if _claude_unavailable:
+        return {"relevant": False, "reason": "api error", "fit_score": 0, "api_error": True}
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     rejection_context = get_rejection_context()
     vault_context = get_vault_rejection_context()
@@ -342,7 +369,18 @@ Respond with JSON only:
         return json.loads(text.strip())
     except Exception as e:
         logging.warning(f"Claude check failed: {e}")
-        return {"relevant": False, "reason": "api error", "fit_score": 0}
+        # Account-level problems (no credits, bad key) will fail every call: stop trying this run
+        account_problem = isinstance(e, (anthropic.AuthenticationError, anthropic.PermissionDeniedError)) \
+            or "credit balance" in str(e).lower()
+        if account_problem:
+            _claude_unavailable = e
+            notify_api_problem(e)
+        # Temporary outages are worth retrying next run too; anything else (e.g. unparseable
+        # output for one job) is treated as a rejection so it can't be retried forever.
+        transient = isinstance(e, (anthropic.RateLimitError, anthropic.APIConnectionError,
+                                   anthropic.InternalServerError))
+        return {"relevant": False, "reason": "api error", "fit_score": 0,
+                "api_error": account_problem or transient}
 
 
 def send_discord_alert(job, analysis, is_repost=False):
@@ -473,6 +511,10 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
                 continue
 
         analysis = claude_relevance_check(job_dict)
+        if analysis.get("api_error"):
+            # Not a real rejection: leave it unseen so the next run scores it
+            logging.info(f"Not scored (Claude unavailable), will retry: {job_dict.get('title')} @ {job_dict.get('company')}")
+            continue
 
         min_score = 5
         if not analysis.get("relevant") or analysis.get("fit_score", 0) < min_score:
@@ -522,6 +564,8 @@ def run():
             time.sleep(2)
 
     conn.close()
+    if _claude_unavailable:
+        logging.error(f"Claude unavailable this run ({_claude_unavailable}); unscored jobs left for retry")
     logging.info(f"=== Scraper run complete. Jobs alerted: {total_alerted} ===")
 
 
