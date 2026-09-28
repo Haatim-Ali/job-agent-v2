@@ -108,6 +108,31 @@ class TestExperienceFilterRe:
         assert self._match("5 years of experience required")
 
 
+# ── quick_filter company exclusion ────────────────────────────────────────────
+
+class TestQuickFilterExcludeCompanies:
+    """jobright.ai reposts jobs under its own name rather than as the hiring
+    employer -- these are excluded regardless of title/description content."""
+
+    def setup_method(self):
+        import scraper
+        self.fn = scraper.quick_filter
+
+    def test_jobright_ai_excluded(self):
+        passed, reason = self.fn({"title": "Software Engineer Intern", "company": "Jobright.ai"})
+        assert passed is False
+        assert reason == "excluded company"
+
+    def test_jobright_excluded_case_insensitive(self):
+        passed, reason = self.fn({"title": "AI Engineer Intern", "company": "JOBRIGHT"})
+        assert passed is False
+
+    def test_unrelated_company_not_excluded(self):
+        passed, reason = self.fn({"title": "Software Engineer Intern", "company": "Acme Corp"})
+        assert passed is True
+        assert reason == "ok"
+
+
 # ── is_repost_by_title ─────────────────────────────────────────────────────────
 
 class TestIsRepostByTitle:

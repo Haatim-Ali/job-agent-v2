@@ -3,7 +3,7 @@
 Job Scout Tailor - generates tailored resume + cover letter as compiled PDFs.
 
 Usage:
-  python3 tailor.py <job_url>                    # saves PDFs to OUTPUT_DIR (or SACHSPROF_PATH)
+  python3 tailor.py <job_url>                    # saves PDFs to OUTPUT_DIR (or RESUME_SYNC_PATH)
   python3 tailor.py <job_url> <discord_channel>  # sends PDFs as Discord file attachments
 
 Requires: pdflatex  (sudo apt-get install texlive-latex-base texlive-fonts-recommended texlive-latex-extra)
@@ -39,10 +39,10 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 BOT_TOKEN         = os.getenv("DISCORD_BOT_TOKEN")
 SCRIPT_DIR        = os.path.dirname(os.path.abspath(__file__))
 KB_PATH           = os.path.join(SCRIPT_DIR, "experience_kb.yaml")
-RESUME_TEMPLATE   = os.path.join(SCRIPT_DIR, "SachsResumeTemplate.tex")
-COVER_TEMPLATE    = os.path.join(SCRIPT_DIR, "SachsCoverLetterTemplate.tex")
+RESUME_TEMPLATE   = os.path.join(SCRIPT_DIR, "ResumeTemplate.tex")
+COVER_TEMPLATE    = os.path.join(SCRIPT_DIR, "CoverLetterTemplate.tex")
 OUTPUT_DIR        = os.getenv("OUTPUT_DIR", os.path.join(SCRIPT_DIR, "output"))
-SACHSPROF_PATH    = os.getenv("SACHSPROF_PATH", "")   # set in .env for local Windows runs
+RESUME_SYNC_PATH  = os.getenv("RESUME_SYNC_PATH", "")   # optional local sync folder, set in .env
 
 logging.basicConfig(
     filename="/var/log/jobscout_tailor.log",
@@ -105,17 +105,13 @@ def build_resume_tex(data):
     tex = replace_section(tex, 'TAGLINE',
         f'    {{\\large {escape_latex(headline)}}} \\\\[5pt]')
 
-    if resume.get('cush_bullets'):
-        tex = replace_section(tex, 'CUSH_BULLETS',
-            bullets_to_latex(resume['cush_bullets']))
+    if resume.get('aiea_bullets'):
+        tex = replace_section(tex, 'AIEA_BULLETS',
+            bullets_to_latex(resume['aiea_bullets']))
 
-    if resume.get('shockproof_bullets'):
-        tex = replace_section(tex, 'SHOCKPROOF_BULLETS',
-            bullets_to_latex(resume['shockproof_bullets']))
-
-    if resume.get('akpsi_bullets'):
-        tex = replace_section(tex, 'AKPSI_BULLETS',
-            bullets_to_latex(resume['akpsi_bullets']))
+    if resume.get('montessori_bullets'):
+        tex = replace_section(tex, 'MONTESSORI_BULLETS',
+            bullets_to_latex(resume['montessori_bullets']))
 
     return tex
 
@@ -182,14 +178,14 @@ def trim_to_one_page(data, slug, output_dir):
     """
     Iteratively drop the lowest-priority bullet (last in list) from the least
     critical section until the resume compiles to exactly 1 page.
-    Priority order for trimming: AKPsi > Shockproof > Cush.
+    Priority order for trimming: Montessori > AIEA (most relevant, trimmed last).
     """
     resume = {k: list(v) for k, v in data.get('resume', {}).items()}
-    trim_order = ['akpsi_bullets', 'shockproof_bullets', 'cush_bullets']
+    trim_order = ['montessori_bullets', 'aiea_bullets']
 
     for attempt in range(10):
         tex = build_resume_tex({**data, 'resume': resume})
-        pdf = compile_pdf(tex, f'SachsResume_{slug}', output_dir)
+        pdf = compile_pdf(tex, f'Resume_{slug}', output_dir)
         if pdf is None:
             return None, tex
 
@@ -217,7 +213,7 @@ def trim_cover_to_one_page(data, slug, client, output_dir):
     """Compile cover letter. If > 1 page, ask Claude to shorten paragraphs and retry once."""
     cl = data.get('cover_letter', {})
     cover_tex = build_cover_tex(data)
-    cover_pdf = compile_pdf(cover_tex, f'SachsCoverLetter_{slug}', output_dir)
+    cover_pdf = compile_pdf(cover_tex, f'CoverLetter_{slug}', output_dir)
 
     pages = count_pages(cover_pdf)
     if pages is None or pages <= 1:
@@ -245,7 +241,7 @@ P3: {cl.get('paragraph_3', '')}"""}]
         if shorter:
             updated = {**data, 'cover_letter': shorter}
             cover_tex = build_cover_tex(updated)
-            cover_pdf = compile_pdf(cover_tex, f'SachsCoverLetter_{slug}', output_dir)
+            cover_pdf = compile_pdf(cover_tex, f'CoverLetter_{slug}', output_dir)
             logging.info(f"Cover letter recompiled after shortening: {count_pages(cover_pdf)} page(s)")
     except Exception as e:
         logging.warning(f"Cover trim failed: {e}")
@@ -274,9 +270,41 @@ def fetch_job_description(url):
             if el and len(el.get_text(strip=True)) > 200:
                 return el.get_text(separator="\n", strip=True)
         body = soup.find("body")
-        return body.get_text(separator="\n", strip=True)[:6000] if body else resp.text[:4000]
+        text = body.get_text(separator="\n", strip=True) if body else resp.text
+        if len(text) > 200:
+            return text[:6000]
     except Exception as e:
         logging.error(f"Failed to fetch JD from {url}: {e}")
+
+    # Some sites (e.g. IBM careers) sit behind a JS bot-challenge (AWS WAF)
+    # that returns an empty/near-empty page to a plain HTTP request -- a
+    # real browser is the only thing that can pass the challenge.
+    logging.info(f"Plain fetch came back empty for {url} -- retrying with headless browser")
+    return fetch_job_description_browser(url)
+
+
+def fetch_job_description_browser(url):
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError:
+        logging.error(
+            "playwright not installed -- run: pip install playwright && playwright install chromium"
+        )
+        return None
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page(user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ))
+            page.goto(url, timeout=25000, wait_until="load")
+            page.wait_for_timeout(5000)
+            text = page.inner_text("body")
+            browser.close()
+            return text[:6000] if text and len(text) > 200 else None
+    except Exception as e:
+        logging.error(f"Headless browser fetch failed for {url}: {e}")
         return None
 
 
@@ -336,7 +364,7 @@ def tailor(job_url, job_description=None, custom_prompt=""):
     logging.info("Pass 2: Matching experience")
     matching = parse_json_response(client.messages.create(
         model="claude-sonnet-4-6", max_tokens=1000,
-        messages=[{"role": "user", "content": f"""Match Josh's experience to this job. Only use facts from the KB.
+        messages=[{"role": "user", "content": f"""Match the candidate's experience to this job. Only use facts from the KB.
 
 KB:
 {kb_str}
@@ -347,7 +375,7 @@ ATS keywords: {json.dumps(analysis.get("ats_keywords", []))}
 
 Return JSON only:
 {{
-  "lead_experience": "Cush or Shockproof and why",
+  "lead_experience": "which experience -- AIEA Lab or Montessori -- best fits this role and why",
   "cover_letter_angle": "one specific story that best fits this role",
   "gaps": [{{"gap": "requirement", "talking_point": "how to address it"}}]
 }}"""}]
@@ -361,7 +389,7 @@ Return JSON only:
     custom_section = f"\nADDITIONAL INSTRUCTIONS FROM USER:\n{custom_prompt}\n" if custom_prompt else ""
     structured = parse_json_response(client.messages.create(
         model="claude-sonnet-4-6", max_tokens=3000,
-        messages=[{"role": "user", "content": f"""Generate a tailored application for Josh Sachs applying to {analysis.get("role_title")} at {analysis.get("company")}.
+        messages=[{"role": "user", "content": f"""Generate a tailored application for {kb.get("personal", {}).get("name", "the candidate")} applying to {analysis.get("role_title")} at {analysis.get("company")}.
 
 RULES:
 - Only use real experience from the KB. Never fabricate metrics or responsibilities.
@@ -381,9 +409,8 @@ Return JSON only:
 {{
   "headline": "tailored one-line resume tagline",
   "resume": {{
-    "cush_bullets": ["3-5 bullets, most relevant first"],
-    "shockproof_bullets": ["2-3 bullets, most relevant first"],
-    "akpsi_bullets": ["1-2 bullets, most relevant first"]
+    "aiea_bullets": ["3-5 bullets, most relevant first"],
+    "montessori_bullets": ["1-2 bullets, most relevant first"]
   }},
   "cover_letter": {{
     "date": "{today}",
@@ -409,13 +436,13 @@ Return JSON only:
 
     # Fallback: save .tex files if pdflatex unavailable
     if resume_pdf is None:
-        path = os.path.join(OUTPUT_DIR, f'SachsResume_{slug}.tex')
+        path = os.path.join(OUTPUT_DIR, f'Resume_{slug}.tex')
         with open(path, 'w', encoding='utf-8') as f:
             f.write(build_resume_tex(structured))
         logging.warning(f"Resume PDF failed -- .tex saved to {path}")
 
     if cover_pdf is None:
-        path = os.path.join(OUTPUT_DIR, f'SachsCoverLetter_{slug}.tex')
+        path = os.path.join(OUTPUT_DIR, f'CoverLetter_{slug}.tex')
         with open(path, 'w', encoding='utf-8') as f:
             f.write(build_cover_tex(structured))
         logging.warning(f"Cover PDF failed -- .tex saved to {path}")
@@ -453,21 +480,26 @@ async def send_to_discord(channel_id, job_url, resume_pdf, cover_pdf, analysis):
 
             files = []
             if resume_pdf and os.path.exists(resume_pdf):
-                files.append(discord.File(resume_pdf, filename=f"SachsResume_{company}.pdf"))
+                files.append(discord.File(resume_pdf, filename=f"Resume_{company}.pdf"))
             if cover_pdf and os.path.exists(cover_pdf):
-                files.append(discord.File(cover_pdf, filename=f"SachsCoverLetter_{company}.pdf"))
+                files.append(discord.File(cover_pdf, filename=f"CoverLetter_{company}.pdf"))
 
-            await channel.send(
-                content=f"**{role} @ {company}**\n{job_url}",
-                files=files or discord.utils.MISSING
-            )
-
-            if not files:
+            error = analysis.get("error")
+            if error:
+                await channel.send(f"Tailor failed: {error}")
+            else:
                 await channel.send(
-                    "pdflatex not installed. Run on VPS:\n"
-                    "`sudo apt-get install texlive-latex-base texlive-fonts-recommended texlive-latex-extra`\n"
-                    f".tex files saved to `{OUTPUT_DIR}`"
+                    content=f"**{role} @ {company}**\n{job_url}",
+                    files=files or discord.utils.MISSING
                 )
+
+                if not files:
+                    await channel.send(
+                        "PDF generation failed -- check /var/log/jobscout_tailor.log for details.\n"
+                        "If pdflatex isn't installed, run on VPS:\n"
+                        "`sudo apt-get install texlive-latex-base texlive-fonts-recommended texlive-latex-extra`\n"
+                        f".tex files saved to `{OUTPUT_DIR}`"
+                    )
 
             if gaps:
                 for chunk in [gaps[i:i+1800] for i in range(0, len(gaps), 1800)]:
@@ -507,13 +539,13 @@ def main():
     if channel_id:
         asyncio.run(send_to_discord(channel_id, job_url, resume_pdf, cover_pdf, analysis))
     else:
-        # CLI mode: copy to SACHSPROF_PATH if configured, else leave in OUTPUT_DIR
-        dest = SACHSPROF_PATH if SACHSPROF_PATH and os.path.isdir(SACHSPROF_PATH) else OUTPUT_DIR
+        # CLI mode: copy to RESUME_SYNC_PATH if configured, else leave in OUTPUT_DIR
+        dest = RESUME_SYNC_PATH if RESUME_SYNC_PATH and os.path.isdir(RESUME_SYNC_PATH) else OUTPUT_DIR
         slug = analysis.get("company_slug", "company")
 
         for src, name in [
-            (resume_pdf, f"SachsResume_{slug}.pdf"),
-            (cover_pdf,  f"SachsCoverLetter_{slug}.pdf"),
+            (resume_pdf, f"Resume_{slug}.pdf"),
+            (cover_pdf,  f"CoverLetter_{slug}.pdf"),
         ]:
             if src and os.path.exists(src):
                 final = os.path.join(dest, name)

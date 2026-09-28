@@ -29,8 +29,6 @@ DISCORD_USER_ID = int(os.getenv("DISCORD_USER_ID", "0"))
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 VENV_PYTHON = os.path.join(SCRIPT_DIR, "venv", "bin", "python")
 DB_PATH = os.path.join(SCRIPT_DIR, "jobs.db")
-INGEST_URL = os.getenv("INGEST_URL", "https://job-agent-henna.vercel.app")
-INGEST_API_KEY = os.getenv("INGEST_API_KEY")
 MEMORY_REPO_PATH = os.getenv("MEMORY_REPO_PATH")  # local clone of job-agent-memory repo
 
 STATUSES = ["applied", "phone_screen", "interview", "offer", "rejected", "withdrawn"]
@@ -179,23 +177,6 @@ def get_stats():
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
 import re as _re
-import requests as _requests
-
-def sync_to_web_ui(job_url, status, title="", company="", description=""):
-    """Mirror a status change to the web UI's Supabase database."""
-    if not INGEST_API_KEY or not job_url:
-        return
-    try:
-        base = INGEST_URL.rstrip("/")
-        resp = _requests.post(
-            f"{base}/api/jobs/sync",
-            json={"url": job_url, "status": status, "title": title, "company": company, "description": description},
-            headers={"x-api-key": INGEST_API_KEY},
-            timeout=8,
-        )
-        logging.info(f"Web UI sync: {status} for {job_url} → {resp.status_code}")
-    except Exception as e:
-        logging.warning(f"sync_to_web_ui error: {e}")
 
 
 def _write_rejection_to_vault(title, company, reason):
@@ -321,12 +302,7 @@ async def on_raw_reaction_add(payload):
         job_url, title, company = _extract_job_info(message, payload.channel_id)
         if not job_url:
             return
-        # Extract description from embed if available
-        description = ""
-        if message.embeds and message.embeds[0].description:
-            description = message.embeds[0].description
         log_application(job_url, title.strip(), company.strip())
-        sync_to_web_ui(job_url, "applied", title.strip(), company.strip(), description)
         await channel.send(
             f"<@{payload.user_id}> 📨 Logged application!\n"
             f"> **{title.strip()}** at **{company.strip()}**\n"
@@ -340,12 +316,6 @@ async def on_raw_reaction_add(payload):
         if not job_url:
             await channel.send(f"<@{payload.user_id}> Dismissed.")
             return
-
-        # Sync to web UI immediately (before asking for reason)
-        description = ""
-        if message.embeds and message.embeds[0].description:
-            description = message.embeds[0].description
-        sync_to_web_ui(job_url, "dismissed", title.strip(), company.strip(), description)
 
         # Ask for reason, store pending state
         prompt_msg = await channel.send(
@@ -560,7 +530,6 @@ async def on_message(message):
             await message.channel.send(f"Invalid status. Choose from: {', '.join(STATUSES)}")
             return
         if update_status(job_url, status):
-            sync_to_web_ui(job_url, status)
             await message.channel.send(f"{STATUS_EMOJI.get(status, '')} Status updated to **{status}**")
         else:
             await message.channel.send("Job URL not found. Log it first with `!applied`")

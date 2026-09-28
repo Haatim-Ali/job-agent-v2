@@ -1,0 +1,133 @@
+% Haatim Ali Resume — template for tailor.py
+% Compatible with Overleaf (pdflatex) — one page
+% Bullet sections between %%_START%% / %%_END%% markers are regenerated per application by tailor.py.
+
+\documentclass[letterpaper,10pt]{article}
+\usepackage{times}
+\newlength{\outerbordwidth}
+\pagestyle{empty}
+\raggedbottom
+\raggedright
+\usepackage[svgnames]{xcolor}
+\usepackage{framed}
+\usepackage{tocloft}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+\input{glyphtounicode}
+\pdfgentounicode=1
+
+%-----------------------------------------------------------
+\setlength{\outerbordwidth}{1pt}
+\definecolor{shadecolor}{gray}{0.4}
+\definecolor{shadecolorB}{gray}{0.96}
+
+%-----------------------------------------------------------
+% Margins
+\setlength{\evensidemargin}{-0.4in}
+\setlength{\headheight}{0in}
+\setlength{\headsep}{0in}
+\setlength{\oddsidemargin}{-0.4in}
+\setlength{\paperheight}{11in}
+\setlength{\paperwidth}{8.5in}
+\setlength{\tabcolsep}{0in}
+\setlength{\textheight}{10.2in}
+\setlength{\textwidth}{7.3in}
+\setlength{\topmargin}{-0.55in}
+\setlength{\topskip}{0in}
+\setlength{\voffset}{0.0in}
+
+\linespread{0.98}
+
+%-----------------------------------------------------------
+% Custom commands
+\newcommand{\resitem}[1]{\item #1 \vspace{-6pt}}
+\newcommand{\resheading}[1]{\vspace{7pt}{\Large \textbf{#1}}\\\vspace{-8pt}\hrulefill}
+\newcommand{\ressubheading}[4]{\vspace{2pt}
+\begin{tabular*}{7.0in}{l@{\cftdotfill{\cftsecdotsep}\extracolsep{\fill}}r}
+        \textbf{#1} & #2 \\
+        \textit{#3} & \textit{#4} \\
+\end{tabular*}\vspace{-6pt}}
+\newcommand{\ressubheadingsmol}[2]{\vspace{1pt}
+\begin{tabular*}{7.0in}{l@{\cftdotfill{\cftsecdotsep}\extracolsep{\fill}}r}
+        \textbf{#1} & \textit{#2} \\
+\end{tabular*}\vspace{-6pt}}
+%-----------------------------------------------------------
+
+\begin{document}
+
+\begin{tabular*}{7in}{l@{\extracolsep{\fill}}r}
+\textbf{\huge Haatim Ali} & haatimta@gmail.com \\
+San Jose, CA $\cdot$ (510) 468-7997 & \href{https://www.linkedin.com/in/haatim-ali}{linkedin.com/in/haatim-ali} $\cdot$ \href{https://github.com/Haatim-Ali}{github.com/Haatim-Ali} \\
+\end{tabular*}
+\\
+% %%TAGLINE_START%%
+% %%TAGLINE_END%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\resheading{Education}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\ressubheading{University of California, Santa Cruz}{Santa Cruz, CA}{B.S. Computer Science}{Expected March 2028}
+\begin{itemize}
+    \resitem{\textbf{Relevant Coursework:} Calculus I--II, Linear Algebra, Statistics, Python Programming (CSE 20, CSE 30), Computer Systems \& Assembly Language}
+    \resitem{\textbf{Campus Involvements:} Alpha Kappa Psi (Historian), AIEA Lab, Grappling Club, Google Developer Groups on Campus}
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\resheading{Professional Experience}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\ressubheading{Undergraduate Research Assistant — Autonomous Vehicles}{Santa Cruz, CA}{AIEA Lab}{May 2026 -- Present}
+\begin{itemize}
+% %%AIEA_BULLETS_START%%
+    \resitem{Trained a \textbf{CNN image classifier} via GPU-backed \textbf{Kubernetes} deployments (Nautilus), managing PVCs, Deployments, and Jobs to eliminate idle GPU-node costs}
+    \resitem{Implemented and benchmarked \textbf{5} RL algorithms (PPO, DQN, SAC, DDPG, Stable Baselines3 baseline) against the CarRacing-v2 continuous-control environment, logging reward/loss convergence via TensorBoard}
+    \resitem{Engineered a single-file benchmarking framework automating training, hyperparameter sweeps, and reward-curve generation across \textbf{3+} RL algorithms in parallel}
+% %%AIEA_BULLETS_END%%
+\end{itemize}
+
+\ressubheading{Website Developer}{Milpitas, CA}{Golden Harvest Montessori}{June 2022 -- Present}
+\begin{itemize}
+% %%MONTESSORI_BULLETS_START%%
+    \resitem{Founded and led a \textbf{3}-person team to build a school website from scratch, now driving \textbf{150+} parent enrollments over \textbf{3} years}
+    \resitem{Root-caused a production outage across \textbf{6} of \textbf{8} live pages to a legacy CMS stripping script tags, restoring jQuery/Bootstrap functionality site-wide}
+    \resitem{Re-architected inline-styled markup into a modular per-page CSS system across \textbf{8} pages, removing \textbf{18+} dead style rules with \textbf{zero} visual regressions}
+% %%MONTESSORI_BULLETS_END%%
+\end{itemize}
+
+\ressubheading{Python Programming Camp Instructor}{Milpitas, CA}{Golden Harvest Montessori}{Summers 2022 -- 2025}
+\begin{itemize}
+    \resitem{Directed a 4-week Python fundamentals camp (syntax, control flow, functions, debugging) for \textbf{30+} students ages 6--12, achieving a \textbf{100\%} project completion and live-demo rate}
+    \resitem{Designed a \textbf{20+} lesson curriculum sequencing core CS concepts into age-appropriate, project-based exercises, adopted as the school's standard summer CS program across \textbf{4} consecutive years}
+    \resitem{Recruited, trained, and managed \textbf{2} volunteer teaching assistants, delegating lesson support and 1:1 debugging help across \textbf{6+} hours of daily instruction}
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\resheading{Projects}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\ressubheading{Pathwise --- Autonomous Planning Agent}{\href{https://github.com/Haatim-Ali/pathwise}{github.com/Haatim-Ali/pathwise}}{Hack-a-Claw 2026, 24-hour NVIDIA hackathon at UCSC Baskin Engineering (team of 3)}{May 2026}
+\begin{itemize}
+    \resitem{Built an autonomous agent system converting unstructured, plain-English user input into a structured, month-by-month action plan --- combining live external data retrieval (Tavily API), multi-step reasoning on \textbf{NVIDIA Nemotron 49B via NIM}, persistent memory, and what-if scenario modeling}
+    \resitem{Designed the agent's reasoning pipeline to reconcile multiple live data sources and competing constraints into a single coherent recommendation, applied to the domain of personal financial planning (debt schedules, savings rates, market data)}
+    \resitem{Shipped a working \textbf{Flask + Chart.js} full-stack demo visualizing payoff timelines, surplus allocation, and net worth trajectory within the \textbf{24-hour} window, submitted to the Cloud and Best for UCSC prize tracks}
+\end{itemize}
+
+\ressubheading{JobAgent --- AI-Powered Job Search Automation}{\href{https://github.com/Haatim-Ali/job-agent}{github.com/Haatim-Ali/job-agent}}{Personal project, co-developed with 1 collaborator}{March 2026 -- Present}
+\begin{itemize}
+    \resitem{Led the AI/ML pipeline design, integrating a two-tier \textbf{Claude API} architecture --- \textbf{Haiku-4-5} for high-volume job relevance filtering, \textbf{Sonnet-4-6} for conversational cover letter generation, interview prep, and role analysis}
+    \resitem{Built a Python scraping service (JobSpy, BeautifulSoup) polling LinkedIn every \textbf{30 minutes}, feeding a Supabase-backed pipeline that tracks applications through a \textbf{6}-stage Kanban workflow (New \(\rightarrow\) Saved \(\rightarrow\) Applied \(\rightarrow\) Interviewing \(\rightarrow\) Offer \(\rightarrow\) Rejected)}
+    \resitem{Engineered a \textbf{Discord bot} (discord.py) delivering rich embed alerts with AI-generated fit scores, applicant counts, and posting freshness, with emoji-reaction shortcuts driving downstream pipeline actions}
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\resheading{Additional}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\vspace{-6pt}
+\begin{itemize}
+    \resitem{\textbf{Technical:} Python, Java, JavaScript/TypeScript, HTML/CSS, Excel; Next.js, Flask, Supabase/PostgreSQL, Kubernetes, Git; Claude API, NVIDIA NIM, Stable Baselines3, TensorBoard; AI-assisted development tooling (Claude Code, GPT-4o, Gemini, OpenClaw) used to automate analyses and build tooling}
+    \resitem{\textbf{Analytical:} Scenario \& what-if modeling, reward-curve/hyperparameter analysis, root-cause debugging, curriculum \& instructional design, data-driven pipeline design}
+    \resitem{\textbf{Interests:} Weightlifting, Soccer, Hiking, Jujitsu, Anime}
+\end{itemize}
+
+\end{document}

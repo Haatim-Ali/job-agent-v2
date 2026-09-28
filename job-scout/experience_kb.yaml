@@ -1,110 +1,128 @@
 personal:
-  name: Josh Sachs
-  email: joshs15260@gmail.com
-  phone: (510) 517-1526
-  location: Oakland / Santa Cruz, CA
-  linkedin: linkedin.com/in/josh-sachs
-  headline: Aspiring Sales Engineer combining technical fluency with client-facing communication experience
+  name: Haatim Ali
+  email: haatimta@gmail.com
+  phone: (510) 468-7997
+  location: San Jose, CA
+  linkedin: linkedin.com/in/haatim-ali
+  github: github.com/Haatim-Ali
+  headline: CS student at UC Santa Cruz building AI/ML tools and autonomous agents
 
 education:
   - institution: University of California, Santa Cruz
-    degree: Bachelor of Arts (B.A.) in Computer Science
-    dates: Sep 2022 - Jun 2026 (Expected)
+    degree: Bachelor of Science (B.S.) in Computer Science
+    dates: Expected March 2028
     location: Santa Cruz, CA
     coursework:
-      - Data Structures
-      - Systems Design
-      - Databases
+      - Calculus I-II
+      - Linear Algebra
+      - Statistics
+      - Python Programming (CSE 20, CSE 30)
+      - Computer Systems & Assembly Language
+    involvements:
+      - Alpha Kappa Psi (Historian)
+      - AIEA Lab
+      - Grappling Club
+      - Google Developer Groups on Campus
 
 skills:
   technical:
     - Python
-    - C
-    - C++
-    - JavaScript
-    - Zapier
-    - RealScout
-    - Follow Up Boss (CRM)
-    - Google Sheets API
-    - Gmail API
-    - Google Suite
-    - Adobe Suite
+    - Java
+    - JavaScript/TypeScript
+    - HTML/CSS
+    - Excel
+    - Next.js
+    - Flask
+    - Supabase/PostgreSQL
+    - Kubernetes
+    - Git
+    - Claude API
+    - NVIDIA NIM
+    - Stable Baselines3
+    - TensorBoard
+    - "AI-assisted development tooling (Claude Code, GPT-4o, Gemini, OpenClaw) used to automate analyses and build tooling"
   core:
-    - Workflow Automation
-    - Data Structures
-    - Basic Machine Learning
-    - Problem Solving
+    - Scenario & what-if modeling
+    - Reward-curve / hyperparameter analysis
+    - Root-cause debugging
+    - Curriculum & instructional design
+    - Data-driven pipeline design
   soft:
-    - Leadership
-    - Public Speaking
-    - Adaptability
-    - Team Development
-    - Cold Calling
-    - Client-facing Communication
-    - Demo Scheduling
-    - Sales Prospecting
+    - Written & presentation communication
+    - Team leadership
 
 experience:
-  - title: Workflow & Automation Intern, Engineer
-    company: Cush Real Estate
-    location: Oakland, CA
-    dates: Jun 2025 - Present
-    bullets:
-      - "Automated lead routing for 10+ agents using Zapier, RealScout, and Follow Up Boss, cutting processing time by 90%"
-      - "Implemented Python tool to synchronize local realtor data, by region, into Google Sheets, enabling streamlined outreach and simplifying reporting"
-      - "Built three-stage Action Plan workflow, improving pipeline visibility, raising follow-up compliance by 35%"
-      - "Authored daily analytics briefs for founders, translating technical sales metrics into actionable business recommendations to cut operating costs"
-      - "Hired as Automation Engineer following successful internship"
-      - "Led RealScout platform transition -- evaluated, recommended, and onboarded 10+ agents"
-    key_metrics:
-      - "90% reduction in lead routing processing time"
-      - "35% improvement in follow-up compliance"
-      - "10+ agents onboarded to new platform"
-    narrative: "Was on the buying side of a sales engineer interaction during the RealScout evaluation and it made me want to do this full-time"
-
-  - title: Sales Engineering Intern
-    company: Shockproof
-    location: Remote
-    dates: May 2025 - Present
-    bullets:
-      - "Built automation sending 50 targeted outreach emails a day from a 3000+ contact list, improving outreach efficiency by 80%, using Python, JavaScript, Google Sheets and Gmail APIs"
-      - "Implemented task scheduler, triggering emails and validating successful operation"
-      - "Managed client demo scheduling via Google Sheets, ensuring coordination between sales and technical teams"
-      - "Navigated complex org structures at banks to reach decision-makers"
-      - "Conducted cold calling outreach as part of sales prospecting workflow"
-    key_metrics:
-      - "50 targeted emails per day"
-      - "3000+ contact list"
-      - "80% improvement in outreach efficiency"
-
-leadership:
-  - title: Vice President of Member Integration
-    organization: Alpha Kappa Psi, Chi Gamma Chapter
+  - title: Undergraduate Research Assistant -- Autonomous Vehicles
+    company: AIEA Lab
     location: Santa Cruz, CA
-    dates: Jun 2025 - Nov 2025
+    dates: May 2026 - Present
     bullets:
-      - "Led a 16-member initiate class that raised $6.5K in under 7 weeks through coordinated fundraising events"
-      - "Ran a 7-week professional development program with alumni workshops, interview preparation, and weekly accountability checkpoints"
+      - "Trained a CNN image classifier via GPU-backed Kubernetes deployments (Nautilus), managing PVCs, Deployments, and Jobs to eliminate idle GPU-node costs"
+      - "Implemented and benchmarked 5 RL algorithms (PPO, DQN, SAC, DDPG, Stable Baselines3 baseline) against the CarRacing-v2 continuous-control environment, logging reward/loss convergence via TensorBoard"
+      - "Engineered a single-file benchmarking framework automating training, hyperparameter sweeps, and reward-curve generation across 3+ RL algorithms in parallel"
+    key_metrics:
+      - "5 RL algorithms implemented and benchmarked"
+      - "3+ RL algorithms benchmarked in parallel via a custom framework"
+    narrative: "Direct hands-on research experience with ML training pipelines, GPU infrastructure, and RL -- the strongest evidence of applied AI/ML capability."
 
-  - title: Conservationist
-    organization: Operation Wallacea
-    location: Fiji
-    dates: Jun 2022 - Jul 2022
+  - title: Website Developer
+    company: Golden Harvest Montessori
+    location: Milpitas, CA
+    dates: June 2022 - Present
     bullets:
-      - "Collected data for AI model linking satellite imagery with on-site biomass measurements and endangered-species observations to estimate carbon sequestration for governmental policy-making on environment and land-use"
+      - "Founded and led a 3-person team to build a school website from scratch, now driving 150+ parent enrollments over 3 years"
+      - "Root-caused a production outage across 6 of 8 live pages to a legacy CMS stripping script tags, restoring jQuery/Bootstrap functionality site-wide"
+      - "Re-architected inline-styled markup into a modular per-page CSS system across 8 pages, removing 18+ dead style rules with zero visual regressions"
+    key_metrics:
+      - "150+ parent enrollments driven over 3 years"
+      - "Restored functionality across 6 of 8 production pages after root-causing a CMS outage"
+      - "Removed 18+ dead CSS rules across 8 pages with zero regressions"
+    narrative: "Longest-running project -- founded and led the team behind a production website, with hands-on ownership of outages and technical debt cleanup, long before the AI/ML focus."
 
-  - title: Team Leader
-    organization: Amor Ministries
-    location: Mexico
-    dates: Dec 2021 - Apr 2022
+  - title: Python Programming Camp Instructor
+    company: Golden Harvest Montessori
+    location: Milpitas, CA
+    dates: Summers 2022 - 2025
     bullets:
-      - "Led a 10-person student team building housing for an under-resourced family and managed on-site logistics"
+      - "Directed a 4-week Python fundamentals camp (syntax, control flow, functions, debugging) for 30+ students ages 6-12, achieving a 100% project completion and live-demo rate"
+      - "Designed a 20+ lesson curriculum sequencing core CS concepts into age-appropriate, project-based exercises, adopted as the school's standard summer CS program across 4 consecutive years"
+      - "Recruited, trained, and managed 2 volunteer teaching assistants, delegating lesson support and 1:1 debugging help across 6+ hours of daily instruction"
+    key_metrics:
+      - "30+ students taught per camp, ages 6-12"
+      - "100% project completion and live-demo rate"
+      - "Curriculum adopted as the standard program across 4 consecutive years"
+    narrative: "Teaching experience showing curriculum design and mentorship ability -- a second, teaching-focused angle at the same organization as the website work."
+
+projects:
+  - name: Pathwise -- Autonomous Planning Agent
+    context: "Hack-a-Claw 2026, 24-hour NVIDIA hackathon at UCSC Baskin Engineering (team of 3)"
+    dates: May 2026
+    link: github.com/Haatim-Ali/pathwise
+    bullets:
+      - "Built an autonomous agent system converting unstructured, plain-English user input into a structured, month-by-month action plan -- combining live external data retrieval (Tavily API), multi-step reasoning on NVIDIA Nemotron 49B via NIM, persistent memory, and what-if scenario modeling"
+      - "Designed the agent's reasoning pipeline to reconcile multiple live data sources and competing constraints into a single coherent recommendation, applied to the domain of personal financial planning (debt schedules, savings rates, market data)"
+      - "Shipped a working Flask + Chart.js full-stack demo visualizing payoff timelines, surplus allocation, and net worth trajectory within the 24-hour window, submitted to the Cloud and Best for UCSC prize tracks"
+
+  - name: JobAgent -- AI-Powered Job Search Automation
+    context: "Personal project, co-developed with 1 collaborator"
+    dates: March 2026 - Present
+    link: github.com/Haatim-Ali/job-agent
+    bullets:
+      - "Led the AI/ML pipeline design, integrating a two-tier Claude API architecture -- Haiku-4-5 for high-volume job relevance filtering, Sonnet-4-6 for conversational cover letter generation, interview prep, and role analysis"
+      - "Built a Python scraping service (JobSpy, BeautifulSoup) polling LinkedIn every 30 minutes, feeding a Supabase-backed pipeline that tracks applications through a 6-stage Kanban workflow (New -> Saved -> Applied -> Interviewing -> Offer -> Rejected)"
+      - "Engineered a Discord bot (discord.py) delivering rich embed alerts with AI-generated fit scores, applicant counts, and posting freshness, with emoji-reaction shortcuts driving downstream pipeline actions"
+
+interests:
+  - Weightlifting
+  - Soccer
+  - Hiking
+  - Jujitsu
+  - Anime
 
 cover_letter_style:
   strengths:
-    - Story-led openings work best
-    - Lead with genuine company interest specific to that company
-    - Strong closer with logistics line
-    - Personal and specific beats formulaic every time
-  key_narrative: "I have been on the buying side of a sales engineer interaction (RealScout evaluation) and it made me want to do this full-time"
-  voice: "Direct, enthusiastic, technically literate but people-first. No corporate fluff."
+    - Direct, story-led -- leads with a concrete problem before the pitch
+    - Technically literate without corporate fluff
+  key_narrative: "Hands-on builder -- from AIEA Lab's RL research to Pathwise's 24-hour hackathon build -- who ships working systems, not just coursework."
+  voice: "Direct, enthusiastic, technically literate but people-first. No corporate speak, no em dashes."
+  one_page: true

@@ -5,70 +5,20 @@
 # No Python knowledge needed — just edit the text below.
 # ─────────────────────────────────────────────────────────────
 
-name: "Josh Sachs"
+name: "Haatim Ali"
 
 # Your current situation in one sentence
-background: "New grad CS student graduating June 2026 from UC Santa Cruz"
+background: "UCSC CS student (Expected March 2028) with AI/ML research and hackathon experience"
 
 # ── Main job targets ─────────────────────────────────────────
-# The AI uses this section to filter SDR / Sales / GTM roles
 main_roles:
-  target_roles: "SDR, BDR, Sales Development, Sales Engineer, Solutions Engineer, Account Development, Technical Sales, entry-level AE"
-  industry: "Tech, SaaS, AI, Automation only (no healthcare, insurance, staffing agencies)"
-  locations: "Bay Area (SF, Oakland, East Bay, South Bay/Peninsula) or Remote"
-  min_pay: "$55k+ base with path to $100k+ via OTE or fast promotion"
-  experience_level: "suitable for 0-2 years (does NOT need to say 'new grad' explicitly)"
-  include_internships: "sales/GTM/BD internships at well-known tech companies with high intern-to-FT conversion"
+  target_roles: "Software Engineer Intern, AI/ML Engineer Intern, Applied ML Intern, Agentic AI Intern, Research Intern, Product Manager Intern, broadly tech-adjacent internships"
+  industry: "Tech, AI/ML, broadly tech-adjacent — no exclusions"
+  locations: "Bay Area (SF, San Jose, Santa Cruz, Peninsula, East Bay) or Remote"
+  min_pay: "$25/hr minimum"
+  experience_level: "undergraduate, currently pursuing a Bachelor's degree (B.S. Computer Science) — NOT enrolled in or pursuing a Master's or PhD program"
+  include_internships: "yes — internships are the primary target, not a bonus category"
   disqualifiers:
     - "roles requiring 3+ years experience"
     - "non-English language requirements"
-    - "non-tech industries"
-
-# ── Prompt / AI Engineer targets ─────────────────────────────
-prompt_eng_roles:
-  enabled: true
-  qualifications: |
-    - B.A. Computer Science, UC Santa Cruz (graduating June 2026)
-    - Python (strong), JavaScript, C, C++
-    - Built and shipped automation tools using LLM APIs (Anthropic Claude API)
-    - Experience with workflow automation: Zapier, Google Sheets API, Gmail API
-    - Built AI-powered job scout tool using Claude for relevance scoring
-    - Basic Machine Learning coursework
-    - 2 internships involving automation engineering and sales engineering
-    - No prior dedicated AI/ML engineer role, but hands-on LLM API usage
-  strengths: |
-    - Direct experience writing prompts for Claude (structured JSON output, multi-criteria filtering)
-    - Built production tools with LLM APIs
-    - CS fundamentals (data structures, systems, databases)
-    - Strong Python
-  disqualifiers:
-    - "roles requiring 3+ years experience"
-    - "roles requiring ML research background (PhD/MS level)"
-    - "roles requiring deep model training/fine-tuning expertise"
-    - "non-tech industry"
-    - "non-Bay Area and not remote"
-
-# ── Communications / DevRel targets ──────────────────────────
-comms_roles:
-  enabled: true
-  qualifications: |
-    - B.A. Computer Science, UC Santa Cruz (graduating June 2026) — technical credibility
-    - VP of Member Integration at Alpha Kappa Psi: ran 7-week professional development program,
-      led fundraising raising $6.5K in 7 weeks, alumni workshops, interview prep
-    - Authored daily analytics briefs for founders (translating technical metrics into business recommendations)
-    - Client-facing communication, demo scheduling, cold calling at Shockproof
-    - Public speaking, leadership, team development
-    - Python/JavaScript — can write scripts, build tooling, work with developer audiences
-  best_fit_roles: |
-    - Developer Advocate / Developer Relations (strong fit: CS + communication skills)
-    - Marketing Communications Coordinator at a tech/SaaS company
-    - Community Manager at a tech company
-    - Content Marketing at a tech/SaaS/AI company
-    - Technical Writer entry level
-  disqualifiers:
-    - "roles requiring 3+ years experience"
-    - "PR/comms at non-tech industries (healthcare, finance, law)"
-    - "roles requiring an existing large social media following or journalism background"
-    - "senior-level strategy roles"
-  locations: "Bay Area or Remote only"
-  min_pay: "$50k+ base"
+    - "roles that require the candidate to be currently pursuing a Master's or PhD degree (i.e. Bachelor's students are not eligible) -- this candidate is an undergraduate and does not qualify for graduate-only roles. Note: a role that simply lists Bachelor's/Master's/PhD as alternative acceptable degrees is FINE and should not be disqualified."

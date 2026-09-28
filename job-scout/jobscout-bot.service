@@ -1,0 +1,16 @@
+[Unit]
+Description=Job Scout Discord Bot
+After=network.target
+
+[Service]
+Type=simple
+User=Haatim
+WorkingDirectory=/home/Haatim/job-agent/job-scout
+ExecStart=/home/Haatim/job-agent/job-scout/venv/bin/python /home/Haatim/job-agent/job-scout/bot.py
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
