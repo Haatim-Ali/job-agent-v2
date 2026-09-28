@@ -50,3 +50,14 @@ At the start of each session, read:
 
 Update `job-agent.md` when priorities change, new decisions are made, or active work shifts.
 The bot on the VPS appends to `rejection-patterns.md` automatically when you dismiss a job with a reason.
+
+## Living architecture doc
+
+`docs/job-agent-explained.md` → `docs/Job Agent Explained.pdf` explains how the whole system works.
+Whenever code, config, deployment or architecture changes (or you learn something significant about
+the internals), update the relevant section of the markdown, add a dated Changelog entry, and re-render:
+
+```bash
+cd docs && ~/.claude/skills/gstack/make-pdf/dist/pdf generate --quiet --cover --toc --no-confidential \
+  --author "Haatim Ali" --title "Job Agent Explained" job-agent-explained.md "Job Agent Explained.pdf"
+```
