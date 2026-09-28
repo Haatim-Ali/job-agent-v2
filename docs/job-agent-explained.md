@@ -92,6 +92,8 @@ Claude must answer in **JSON only**:
 
 Structured JSON output means the code can read the answer directly, with no guessing from free text. A job is alerted only if `relevant` is true and `fit_score` is at least 5 (`min_fit_score` in the config).
 
+**If Claude can't be reached** (out of credits, bad key, outage), the job is *not* marked seen. It's kept and retried next run, and you get one ⚠️ warning in Discord per day. That way an outage delays alerts but never loses jobs.
+
 ## 4. The alert
 
 The Discord message is sent through a **webhook**: a secret URL that lets a script post into one channel without running a full bot. The embed shows the title, company, location, age, applicant count, source, fit score and Claude's reason, plus flags such as 🔥 FRESH, ⭐ WATCHLIST COMPANY, ♻️ REPOST, or 🏢 FROM COMPANY CAREER SITE.
@@ -174,4 +176,7 @@ It never touches the Contact or Resume Used columns. Failures are logged, not ra
 - Added `sheets_sync.py`; 📨 and `!status` update the Google Sheet once credentials are configured.
 - Deployed to the VPS the same day (backup at `~/job-scout-backup-2026-09-28/`). Google service-account key stored at `~/.config/job-agent/google-sa.json` (permissions 600) and the two settings added to `.env`.
 - **Bug found in the first real test:** a 📨 reaction logged the application but didn't update the sheet, with no error. `bot.py` imports `sheets_sync` *before* it calls `load_dotenv()`, and `sheets_sync` read its settings at import time, so it always saw them as unset. Fixed by reading the settings when a sync runs, logging when a sync is skipped, and adding a regression test. The Neuralink application from that test was written to row 84. Lesson: settings read at import time depend on import order.
-- 72 tests passing.
+- **Found through the first live run: the Anthropic API credits had run out** (current outage since 9/26, 1:33 AM server time; an earlier one began 7/26). Every Claude call failed, and the scraper treated each failure as a rejection and marked the job seen, so **702 jobs were permanently skipped** and no alerts went out.
+- Fixed: account errors (no credits, bad key) and temporary outages (rate limits, connection errors, server errors) now leave the job **unseen so the next run retries it**. After an account error the run stops calling Claude, and the bot posts one ⚠️ Discord warning per day. A one-off failure for a single job (e.g. Claude returns unreadable output) is still treated as a rejection, so no job can be retried forever.
+- Lesson: failure paths need the same care as success paths. "Error" and "rejected" looked the same to the code, so an outage silently turned into lost data.
+- 74 tests passing.
