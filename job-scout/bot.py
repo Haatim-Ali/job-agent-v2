@@ -14,6 +14,8 @@ from datetime import datetime, timezone
 from dotenv import load_dotenv
 import discord
 
+import sheets_sync
+
 try:
     from pypdf import PdfReader
     HAS_PYPDF = True
@@ -112,6 +114,13 @@ def log_application(job_url, title, company, notes=""):
     )
     conn.commit()
     conn.close()
+
+
+def get_title_company(job_url):
+    conn = db_conn()
+    row = conn.execute("SELECT title, company FROM applications WHERE job_url = ?", (job_url,)).fetchone()
+    conn.close()
+    return row if row else ("", "")
 
 
 def log_rejection(job_url, title, company, reason):
@@ -303,10 +312,15 @@ async def on_raw_reaction_add(payload):
         if not job_url:
             return
         log_application(job_url, title.strip(), company.strip())
+        sheet_result = await asyncio.get_running_loop().run_in_executor(
+            None, sheets_sync.record_safe, company.strip(), title.strip(), job_url, "applied",
+            f"logged from Discord {datetime.now().strftime('%-m/%-d/%Y')}",
+        )
         await channel.send(
             f"<@{payload.user_id}> 📨 Logged application!\n"
             f"> **{title.strip()}** at **{company.strip()}**\n"
-            f"Use `!status <url> phone_screen` when you hear back."
+            + (f"📊 Tracker: {sheet_result}\n" if sheet_result else "")
+            + "Use `!status <url> phone_screen` when you hear back."
         )
         logging.info(f"Application logged: {title} @ {company}")
 
@@ -530,7 +544,14 @@ async def on_message(message):
             await message.channel.send(f"Invalid status. Choose from: {', '.join(STATUSES)}")
             return
         if update_status(job_url, status):
-            await message.channel.send(f"{STATUS_EMOJI.get(status, '')} Status updated to **{status}**")
+            title, company = get_title_company(job_url)
+            sheet_result = await asyncio.get_running_loop().run_in_executor(
+                None, sheets_sync.record_safe, company, title, job_url, status,
+            )
+            await message.channel.send(
+                f"{STATUS_EMOJI.get(status, '')} Status updated to **{status}**"
+                + (f"\n📊 Tracker: {sheet_result}" if sheet_result else "")
+            )
         else:
             await message.channel.send("Job URL not found. Log it first with `!applied`")
 

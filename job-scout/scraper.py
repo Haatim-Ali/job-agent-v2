@@ -19,6 +19,8 @@ from jobspy import scrape_jobs
 from discord_webhook import DiscordWebhook, DiscordEmbed
 import anthropic
 
+import career_sites
+
 load_dotenv()
 
 WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
@@ -58,6 +60,10 @@ LOCATIONS = _cfg["locations"]
 WATCHLIST_COMPANIES = _cfg["watchlist_companies"]
 EXCLUDE_INDUSTRIES = _cfg["exclude_industries"]
 EXCLUDE_COMPANIES = [c.lower() for c in _cfg.get("exclude_companies", [])]
+CAREER_SITES = _cfg.get("career_sites", {})
+ROLE_KEYWORDS = _cfg.get("role_keywords", [])
+INTERN_KEYWORDS = _cfg.get("intern_keywords", [])
+CAREER_SITE_EXCLUDE_TITLES = _cfg.get("career_site_exclude_titles", [])
 REPOST_SIGNALS = _cfg["repost_signals"]
 
 
@@ -161,12 +167,15 @@ def quick_filter(job):
     if any(term in company for term in EXCLUDE_COMPANIES):
         return False, "excluded company"
 
-    min_sal = job.get("min_amount")
+    # JobSpy reports pay per its "interval"; internships are usually hourly,
+    # so only compare against the matching floor.
     max_sal = job.get("max_amount")
-    if min_sal and max_sal:
+    interval = str(job.get("interval") or "").lower()
+    floors = {"yearly": 40000, "hourly": 25}
+    if max_sal and interval in floors:
         try:
-            if float(max_sal) < 40000:
-                return False, f"salary too low: {max_sal}"
+            if float(max_sal) < floors[interval]:
+                return False, f"pay too low: {max_sal}/{interval}"
         except (ValueError, TypeError):
             pass
 
@@ -373,6 +382,8 @@ def send_discord_alert(job, analysis, is_repost=False):
         flags.append(f"🔥 FRESH -- posted {age_hours:.0f}h ago")
     if is_watchlist:
         flags.append("⭐ WATCHLIST COMPANY")
+    if job.get("site") in ("greenhouse", "lever", "ashby", "amazon"):
+        flags.append("🏢 FROM COMPANY CAREER SITE")
     if applicants is not None:
         try:
             n = int(applicants)
@@ -410,10 +421,14 @@ def send_discord_alert(job, analysis, is_repost=False):
     webhook.execute()
 
 
-def process_jobs(jobs_df, conn, is_remote=False):
+def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
+    """Filter, score and alert on an iterable of job dicts (JobSpy rows or career-site postings).
+
+    Career-site postings are already age-filtered and have no LinkedIn page to scrape,
+    so they skip the page fetch and the freshness/applicant OR filter.
+    """
     alerted = 0
-    for _, job in jobs_df.iterrows():
-        job_dict = job.to_dict()
+    for job_dict in jobs:
         job_url = str(job_dict.get("job_url", ""))
         if not job_url or is_seen(conn, job_url):
             continue
@@ -424,12 +439,14 @@ def process_jobs(jobs_df, conn, is_remote=False):
             mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
             continue
 
-        # Fetch full description, applicant count, and repost flag from page HTML
-        full_desc, applicant_count, page_repost = fetch_full_job_details(job_url)
-        if full_desc:
-            job_dict["description"] = full_desc
-        if applicant_count is not None:
-            job_dict["applicants"] = applicant_count
+        page_repost = False
+        if not from_career_site:
+            # Fetch full description, applicant count, and repost flag from page HTML
+            full_desc, applicant_count, page_repost = fetch_full_job_details(job_url)
+            if full_desc:
+                job_dict["description"] = full_desc
+            if applicant_count is not None:
+                job_dict["applicants"] = applicant_count
 
         # Hard experience filter: reject before Claude if full description contains 5+ years requirement
         desc_text = str(job_dict.get("description") or "")
@@ -443,14 +460,17 @@ def process_jobs(jobs_df, conn, is_remote=False):
         if repost:
             logging.info(f"Repost detected: {job_dict.get('title')} @ {job_dict.get('company')} -- skipping freshness fast-pass")
         elif title_repost:
-            logging.info(f"Title repost (same title+company seen in 7 days): {job_dict.get('title')} @ {job_dict.get('company')} -- noted but not hard-blocked")
-
-        # OR filter
-        passes, age_hours, applicant_count = passes_or_filter(job_dict, is_repost=repost)
-        if not passes:
-            logging.info(f"OR filtered ({age_hours:.1f}h old, {applicant_count} applicants): {job_dict.get('title')} @ {job_dict.get('company')}")
+            # Same role already seen under another URL (e.g. LinkedIn and the career site) -- don't alert twice
+            logging.info(f"Duplicate title+company within 7 days: {job_dict.get('title')} @ {job_dict.get('company')}")
             mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
             continue
+
+        if not from_career_site:
+            passes, age_hours, applicant_count = passes_or_filter(job_dict, is_repost=repost)
+            if not passes:
+                logging.info(f"OR filtered ({age_hours:.1f}h old, {applicant_count} applicants): {job_dict.get('title')} @ {job_dict.get('company')}")
+                mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
+                continue
 
         analysis = claude_relevance_check(job_dict)
 
@@ -473,6 +493,13 @@ def run():
     conn = init_db()
     total_alerted = 0
 
+    # Company career sites first -- they often list roles before LinkedIn does
+    try:
+        postings = career_sites.fetch_all(CAREER_SITES, ROLE_KEYWORDS, INTERN_KEYWORDS, CAREER_SITE_EXCLUDE_TITLES)
+        total_alerted += process_jobs(postings, conn, from_career_site=True)
+    except Exception as e:
+        logging.error(f"Career sites step failed: {e}")
+
     for search_term in SEARCH_TERMS:
         for location in LOCATIONS:
             is_remote = location.strip().lower() == "remote"
@@ -488,7 +515,8 @@ def run():
                 )
                 if jobs_df is not None and not jobs_df.empty:
                     logging.info(f"'{search_term}' in {location}: {len(jobs_df)} results")
-                    total_alerted += process_jobs(jobs_df, conn, is_remote=is_remote)
+                    rows = (row.to_dict() for _, row in jobs_df.iterrows())
+                    total_alerted += process_jobs(rows, conn, is_remote=is_remote)
             except Exception as e:
                 logging.error(f"Error scraping '{search_term}' in {location}: {e}")
             time.sleep(2)

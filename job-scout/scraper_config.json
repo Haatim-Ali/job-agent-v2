@@ -19,8 +19,17 @@
     "Remote"
   ],
   "watchlist_companies": [
-    "anthropic", "openai", "nvidia", "databricks", "scale ai",
-    "cohere", "mistral", "groq", "together ai", "perplexity", "cursor"
+    "anthropic",
+    "openai",
+    "nvidia",
+    "databricks",
+    "scale ai",
+    "cohere",
+    "mistral",
+    "groq",
+    "together ai",
+    "perplexity",
+    "cursor"
   ],
   "exclude_industries": [],
   "exclude_companies": [
@@ -28,8 +37,100 @@
     "jobright"
   ],
   "repost_signals": [
-    "repost", "re-post", "reposting", "re-posting",
-    "previously posted", "originally posted", "posting again",
-    "reactivated", "re-listed", "relisted", "re-opening"
+    "repost",
+    "re-post",
+    "reposting",
+    "re-posting",
+    "previously posted",
+    "originally posted",
+    "posting again",
+    "reactivated",
+    "re-listed",
+    "relisted",
+    "re-opening"
+  ],
+  "career_sites": {
+    "max_age_hours": 72,
+    "greenhouse": [
+      "stripe",
+      "databricks",
+      "roblox",
+      "figma",
+      "anthropic",
+      "cloudflare",
+      "reddit",
+      "discord",
+      "airbnb",
+      "coinbase",
+      "robinhood",
+      "dropbox",
+      "pinterest",
+      "lyft",
+      "instacart",
+      "datadog",
+      "samsara",
+      "scaleai",
+      "asana",
+      "affirm"
+    ],
+    "lever": [
+      "palantir",
+      "spotify"
+    ],
+    "ashby": [
+      "openai",
+      "notion",
+      "ramp",
+      "linear",
+      "perplexity"
+    ],
+    "amazon_queries": [
+      "software development engineer intern",
+      "machine learning intern",
+      "data science intern",
+      "product manager intern"
+    ]
+  },
+  "role_keywords": [
+    "software",
+    "engineer",
+    "developer",
+    "machine learning",
+    "ml ",
+    "ai ",
+    "data",
+    "full stack",
+    "full-stack",
+    "backend",
+    "frontend",
+    "research",
+    "sde",
+    "swe",
+    "product manager",
+    "agentic"
+  ],
+  "intern_keywords": [
+    "intern",
+    "internship",
+    "co-op",
+    "university",
+    "student"
+  ],
+  "career_site_exclude_titles": [
+    "senior",
+    "sr.",
+    "staff",
+    "principal",
+    "lead",
+    "manager ii",
+    "director",
+    "head of",
+    "phd",
+    "ph.d",
+    "postdoc",
+    "sales",
+    "account executive",
+    "recruit",
+    "marketing"
   ]
 }
