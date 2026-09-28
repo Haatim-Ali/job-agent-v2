@@ -101,8 +101,19 @@ def test_matches_company_on_other_tab():
 
 
 def test_disabled_without_env(monkeypatch):
-    monkeypatch.setattr(ss, "SERVICE_ACCOUNT_JSON", None)
+    monkeypatch.delenv("GOOGLE_SERVICE_ACCOUNT_JSON", raising=False)
     assert ss.record("Adobe", "Intern", "", "applied") is None
+
+
+def test_env_read_at_call_time_not_import_time(monkeypatch):
+    # Regression: bot.py imports sheets_sync before load_dotenv(), so settings
+    # captured at import time were always empty and sync silently never ran.
+    monkeypatch.delenv("GOOGLE_SERVICE_ACCOUNT_JSON", raising=False)
+    monkeypatch.delenv("JOB_TRACKER_SHEET_ID", raising=False)
+    assert not ss.enabled()
+    monkeypatch.setenv("GOOGLE_SERVICE_ACCOUNT_JSON", "/tmp/key.json")
+    monkeypatch.setenv("JOB_TRACKER_SHEET_ID", "abc")
+    assert ss.enabled()
 
 
 def test_record_safe_swallows_errors():

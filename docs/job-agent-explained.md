@@ -172,4 +172,6 @@ It never touches the Contact or Resume Used columns. Failures are logged, not ra
 - Added `career_sites.py`: 20 Greenhouse, 2 Lever and 5 Ashby boards plus Amazon, checked before LinkedIn, postings under 72 hours old.
 - The same title at the same company within 7 days is now skipped, so a role on both LinkedIn and a career site alerts once.
 - Added `sheets_sync.py`; 📨 and `!status` update the Google Sheet once credentials are configured.
-- 71 tests passing.
+- Deployed to the VPS the same day (backup at `~/job-scout-backup-2026-09-28/`). Google service-account key stored at `~/.config/job-agent/google-sa.json` (permissions 600) and the two settings added to `.env`.
+- **Bug found in the first real test:** a 📨 reaction logged the application but didn't update the sheet, with no error. `bot.py` imports `sheets_sync` *before* it calls `load_dotenv()`, and `sheets_sync` read its settings at import time, so it always saw them as unset. Fixed by reading the settings when a sync runs, logging when a sync is skipped, and adding a regression test. The Neuralink application from that test was written to row 84. Lesson: settings read at import time depend on import order.
+- 72 tests passing.

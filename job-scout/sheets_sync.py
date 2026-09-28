@@ -15,9 +15,6 @@ import logging
 import os
 import re
 
-SERVICE_ACCOUNT_JSON = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
-SHEET_ID = os.getenv("JOB_TRACKER_SHEET_ID")
-
 STATUS_LABELS = {
     "applied": "Applied",
     "phone_screen": "Phone Screen",
@@ -34,13 +31,19 @@ def normalize_company(name):
     return " ".join(_SUFFIXES.sub(" ", str(name).lower()).split())
 
 
+def _settings():
+    # Read at call time, not import time: bot.py imports this module before load_dotenv() runs.
+    return os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON"), os.getenv("JOB_TRACKER_SHEET_ID")
+
+
 def enabled():
-    return bool(SERVICE_ACCOUNT_JSON and SHEET_ID)
+    return all(_settings())
 
 
 def _open_sheet():
     import gspread  # imported lazily so the bot runs without it when sync is off
-    return gspread.service_account(filename=SERVICE_ACCOUNT_JSON).open_by_key(SHEET_ID)
+    key_file, sheet_id = _settings()
+    return gspread.service_account(filename=key_file).open_by_key(sheet_id)
 
 
 def find_row(worksheets, company, title, url=""):
@@ -69,6 +72,7 @@ def record(company, title, url, status, notes="", sheet=None):
     """Create or update the tracker row. Returns a short description of what changed, or None."""
     if sheet is None:
         if not enabled():
+            logging.info("Sheets sync skipped: GOOGLE_SERVICE_ACCOUNT_JSON / JOB_TRACKER_SHEET_ID not set")
             return None
         sheet = _open_sheet()
     label = STATUS_LABELS.get(status, status.replace("_", " ").title())
@@ -92,7 +96,10 @@ def record(company, title, url, status, notes="", sheet=None):
 def record_safe(*args, **kwargs):
     """record() that logs instead of raising, for use from the Discord bot."""
     try:
-        return record(*args, **kwargs)
+        result = record(*args, **kwargs)
+        if result:
+            logging.info(f"Sheets sync: {result}")
+        return result
     except Exception as e:
         logging.warning(f"Sheets sync failed: {e}")
         return None
