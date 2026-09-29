@@ -4,7 +4,7 @@ How the Job Agent works inside: what each part does, how data moves between the 
 
 ## The one-sentence version
 
-A scraper runs every 30 minutes on a VPS, uses Claude to filter new job postings down to the ones that fit your resume, and sends them to Discord. A Discord bot then turns your emoji reactions into actions: tailoring your resume, logging applications, and learning from the jobs you dismiss.
+A scraper runs every 30 minutes on a VPS, uses Claude to filter new job postings down to the ones that fit your resume, and sends them to Discord. A Discord bot then turns your emoji reactions into actions: tailoring your resume (👍), logging applications (✅), and learning from the jobs you dismiss.
 
 ## System map
 
@@ -31,7 +31,7 @@ flowchart TB
 | `career_sites.py` | Pulls postings straight from company job boards | Called by the scraper at the start of each run |
 | `bot.py` | Listens to Discord reactions and `!commands` | **systemd service**: a background process the server keeps alive and restarts if it crashes |
 | `tailor.py` | Writes a tailored resume and cover letter | Started by the bot as a separate process when you react ✅ |
-| `sheets_sync.py` | Mirrors application status into the Google Sheet | Called by the bot on 📨 and `!status` |
+| `sheets_sync.py` | Mirrors application status into the Google Sheet | Called by the bot on ✅ and `!status` |
 | `jobs.db` | SQLite database file shared by scraper and bot | A single file on the VPS |
 
 **Where it runs:** a **Hostinger VPS** (`srv1856705.hstgr.cloud`, IP `2.25.82.228`, managed from Hostinger's hPanel), in `/home/Haatim/job-agent/job-scout`. A VPS (virtual private server) is a rented Linux machine that stays on 24/7, which is what lets the bot run while your laptop is closed. Cron line: `*/30 * * * * .../venv/bin/python .../scraper.py`. The bot is the systemd service `jobscout-bot`. Logs go to `/var/log/jobscraper.log`.
@@ -104,12 +104,14 @@ The Discord message is sent through a **webhook**: a secret URL that lets a scri
 
 | Reaction / command | What happens |
 |---|---|
-| ✅ | Runs `tailor.py` for that job: a tailored resume (see below) and a Claude-written cover letter, compiled to PDFs with LaTeX (`pdflatex`) and posted back to Discord |
-| 📨 | Logs the job in the `applications` table and fills in the Google Sheet |
+| 👍 | Runs `tailor.py` for that job: a tailored resume (see below) and a Claude-written cover letter, compiled to PDFs with LaTeX (`pdflatex`) and posted back to Discord |
+| ✅ (or the older 📨) | Logs the job in the `applications` table and fills in the Google Sheet |
 | ❌ | Asks why you're passing, then saves the reason to the `rejections` table |
 | `!applied <url> <Company> - <Role>` | Log an application found outside the bot |
 | `!status <url> <status>` | Move an application to phone_screen, interview, offer, rejected or withdrawn (also updates the sheet) |
 | `!tracker`, `!stats`, `!note` | Show the pipeline, show stats, add a note |
+
+**Reaction matching:** `bot.py` normalizes each reaction before comparing it: skin-tone modifiers and invisible variation selectors are stripped, so 👍🏽 and 👍 both mean "tailor." The emoji live in constants at the top of `bot.py` (`TAILOR_EMOJI`, `APPLIED_EMOJI`, `DISMISS_EMOJI`), so changing them is a one-line edit.
 
 **Why tailoring runs as a separate process:** generating and compiling documents takes a while. Running it in a separate process (through `run_in_executor`) keeps the bot responsive to other reactions in the meantime.
 
@@ -150,7 +152,7 @@ The `rejections` table is created the first time you dismiss a job with ❌. As 
 ## Why data lives in two places
 
 - **SQLite on the VPS**: the working memory of the scraper and bot. Fast, local, zero setup.
-- **Google Sheet**: your personal tracker, the view you actually read. `sheets_sync.py` keeps it in step when you react 📨 or run `!status`.
+- **Google Sheet**: your personal tracker, the view you actually read. `sheets_sync.py` keeps it in step when you react ✅ or run `!status`.
 
 # Google Sheet sync
 
@@ -180,6 +182,8 @@ It never touches the Contact or Resume Used columns. Failures are logged, not ra
 > "It's an event-driven pipeline. A cron-scheduled Python scraper pulls postings from LinkedIn and directly from company job boards through small per-source adapters, then runs them through a cost-ordered filter funnel: dedupe, regex, freshness. Only the survivors go to Claude Haiku for a structured JSON fit score. Matches are pushed to Discord by webhook. A separate always-on Discord bot turns emoji reactions into actions: logging applications to a database and my Google Sheet, tailoring my resume with Claude Sonnet and LaTeX, and capturing rejection reasons that get fed back into the scoring prompt, so the filter adapts to my preferences without any retraining."
 
 # Changelog
+
+**2026-09-29: new reactions.** 👍 now tailors the resume and ✅ marks a job applied (previously ✅ tailored and 📨 marked applied). 📨 still works as "applied" so reactions on older alerts behave as expected. Skin-tone variants of 👍 are accepted. 5 new tests (102 total).
 
 **2026-09-28: career sites, pay fix and sheet sync, built on the live VPS code** (local branch `vps`; deploy pending)
 

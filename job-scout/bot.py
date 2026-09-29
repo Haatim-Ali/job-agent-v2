@@ -33,10 +33,22 @@ VENV_PYTHON = os.path.join(SCRIPT_DIR, "venv", "bin", "python")
 DB_PATH = os.path.join(SCRIPT_DIR, "jobs.db")
 MEMORY_REPO_PATH = os.getenv("MEMORY_REPO_PATH")  # local clone of job-agent-memory repo
 
+# Reactions on job alerts. Applied also accepts the old 📨 so reactions on older alerts still work.
+TAILOR_EMOJI = "👍"
+APPLIED_EMOJI = "✅"
+APPLIED_EMOJI_ALIASES = {APPLIED_EMOJI, "📨"}
+DISMISS_EMOJI = "❌"
+
+
+def normalize_emoji(emoji):
+    """Strip skin-tone modifiers and variation selectors so 👍🏽 / 👍️ count as 👍."""
+    return "".join(ch for ch in str(emoji) if not ("\U0001F3FB" <= ch <= "\U0001F3FF" or ch == "\uFE0F"))
+
+
 STATUSES = ["applied", "phone_screen", "interview", "offer", "rejected", "withdrawn"]
 
 STATUS_EMOJI = {
-    "applied": "📨",
+    "applied": "✅",
     "phone_screen": "📞",
     "interview": "🎯",
     "offer": "🎉",
@@ -53,8 +65,8 @@ HELP_TEXT = """**Job Scout Commands:**
 `!help` — show this message
 
 **Reactions on job alerts:**
-✅ — generate tailored resume + cover letter
-📨 — mark as applied
+👍 — generate tailored resume + cover letter
+✅ — mark as applied
 ❌ — dismiss (bot will ask why, helps it learn your preferences)
 
 **#requests channel:**
@@ -246,7 +258,7 @@ async def on_raw_reaction_add(payload):
     if payload.channel_id not in (CHANNEL_ID, REQUESTS_CHANNEL_ID):
         return
 
-    emoji = str(payload.emoji)
+    emoji = normalize_emoji(payload.emoji)
     channel = client.get_channel(payload.channel_id)
     if not channel:
         channel = await client.fetch_channel(payload.channel_id)
@@ -254,7 +266,7 @@ async def on_raw_reaction_add(payload):
     message = await channel.fetch_message(payload.message_id)
 
     # ── Tailor resume ──────────────────────────────────────────────────────
-    if emoji == "✅":
+    if emoji == TAILOR_EMOJI:
         job_url = None
         role_name = "this role"
         custom_prompt = ""
@@ -307,7 +319,7 @@ async def on_raw_reaction_add(payload):
             await channel.send(f"<@{payload.user_id}> Unexpected error: {e}")
 
     # ── Mark applied ───────────────────────────────────────────────────────
-    elif emoji == "📨":
+    elif emoji in APPLIED_EMOJI_ALIASES:
         job_url, title, company = _extract_job_info(message, payload.channel_id)
         if not job_url:
             return
@@ -317,7 +329,7 @@ async def on_raw_reaction_add(payload):
             f"logged from Discord {datetime.now().strftime('%-m/%-d/%Y')}",
         )
         await channel.send(
-            f"<@{payload.user_id}> 📨 Logged application!\n"
+            f"<@{payload.user_id}> ✅ Logged application!\n"
             f"> **{title.strip()}** at **{company.strip()}**\n"
             + (f"📊 Tracker: {sheet_result}\n" if sheet_result else "")
             + "Use `!status <url> phone_screen` when you hear back."
@@ -325,7 +337,7 @@ async def on_raw_reaction_add(payload):
         logging.info(f"Application logged: {title} @ {company}")
 
     # ── Dismiss + learn ────────────────────────────────────────────────────
-    elif emoji == "❌":
+    elif emoji == DISMISS_EMOJI:
         job_url, title, company = _extract_job_info(message, payload.channel_id)
         if not job_url:
             await channel.send(f"<@{payload.user_id}> Dismissed.")
@@ -531,7 +543,7 @@ async def on_message(message):
         company, title = (label.split(" - ", 1) if " - " in label else (label, "Unknown Role"))
         log_application(job_url, title.strip(), company.strip())
         await message.channel.send(
-            f"<@{message.author.id}> Logged! 📨 **{title.strip()}** at **{company.strip()}**"
+            f"<@{message.author.id}> Logged! ✅ **{title.strip()}** at **{company.strip()}**"
         )
 
     elif cmd == "!status":

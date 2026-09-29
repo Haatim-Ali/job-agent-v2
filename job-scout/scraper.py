@@ -453,7 +453,7 @@ def send_discord_alert(job, analysis, is_repost=False):
     embed.add_embed_field(name="Applicants", value=str(applicants) if applicants is not None else "N/A", inline=True)
     embed.add_embed_field(name="Source", value=str(job.get("site", "N/A")).capitalize(), inline=True)
     embed.add_embed_field(name="Why it fits", value=str(analysis.get("reason", "N/A")), inline=False)
-    embed.set_footer(text="✅ tailor resume  |  📨 mark applied  |  ❌ dismiss")
+    embed.set_footer(text="👍 tailor resume  |  ✅ mark applied  |  ❌ dismiss")
 
     webhook.add_embed(embed)
     webhook.execute()
