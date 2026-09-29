@@ -115,7 +115,7 @@ The Discord message is sent through a **webhook**: a secret URL that lets a scri
 
 ## How resume tailoring works
 
-`ResumeTemplate.tex` **is** Haatim's real resume, typeset in LaTeX. Tailoring never regenerates it. It only makes small, checked edits to the 12 bullets in four sections (AIEA Lab, Website Developer, Pathwise, JobAgent). The header, education, camp-instructor bullets and "Additional" section are never touched.
+`ResumeTemplate.tex` **is** Haatim's real resume (`Haatim_Ali_Resume.pdf`), typeset in LaTeX. Verified 2026-09-29: the compiled template matches that PDF line for line, with identical fonts and page size. `experience_kb.yaml`, which the cover letter draws on, is kept consistent with it. Tailoring never regenerates it. It only makes small, checked edits to the 12 bullets in four sections (AIEA Lab, Website Developer, Pathwise, JobAgent). The header, education, camp-instructor bullets and "Additional" section are never touched.
 
 1. **Understand the job.** Claude reads the posting and lists must-haves and keywords.
 2. **Propose edits.** Claude sees the real bullets (with **bold** marked) plus the job description and may only: reorder bullets within a section, swap in the job's wording where it's *true*, and move bold emphasis. It runs at low temperature so results are consistent.
