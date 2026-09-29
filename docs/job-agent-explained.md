@@ -12,7 +12,7 @@ A scraper runs every 30 minutes on a VPS, uses Claude to filter new job postings
 flowchart TB
   LI[LinkedIn] --> S
   CS[Company career sites<br/>Greenhouse, Lever, Ashby, Amazon] --> S
-  subgraph VPS [VPS - Linux server]
+  subgraph VPS [Hostinger VPS - Linux server]
     S[scraper.py<br/>cron, every 30 min] -->|score| H[Claude Haiku]
     S <--> DB[(jobs.db<br/>SQLite)]
     DB <--> B[bot.py<br/>always on]
@@ -34,7 +34,7 @@ flowchart TB
 | `sheets_sync.py` | Mirrors application status into the Google Sheet | Called by the bot on 📨 and `!status` |
 | `jobs.db` | SQLite database file shared by scraper and bot | A single file on the VPS |
 
-**Where it runs:** `/home/Haatim/job-agent/job-scout` on the VPS. Cron line: `*/30 * * * * .../venv/bin/python .../scraper.py`. The bot is the systemd service `jobscout-bot`. Logs go to `/var/log/jobscraper.log`.
+**Where it runs:** a **Hostinger VPS** (`srv1856705.hstgr.cloud`, IP `2.25.82.228`, managed from Hostinger's hPanel), in `/home/Haatim/job-agent/job-scout`. A VPS (virtual private server) is a rented Linux machine that stays on 24/7, which is what lets the bot run while your laptop is closed. Cron line: `*/30 * * * * .../venv/bin/python .../scraper.py`. The bot is the systemd service `jobscout-bot`. Logs go to `/var/log/jobscraper.log`.
 
 The original project also had a web dashboard (Next.js + Supabase). **Your deployment doesn't use it**: the web-UI sync code was removed from the VPS copy, and the Google Sheet plays that role instead.
 
