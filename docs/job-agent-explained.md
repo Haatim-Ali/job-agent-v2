@@ -180,3 +180,4 @@ It never touches the Contact or Resume Used columns. Failures are logged, not ra
 - Fixed: account errors (no credits, bad key) and temporary outages (rate limits, connection errors, server errors) now leave the job **unseen so the next run retries it**. After an account error the run stops calling Claude, and the bot posts one ⚠️ Discord warning per day. A one-off failure for a single job (e.g. Claude returns unreadable output) is still treated as a rejection, so no job can be retried forever.
 - Lesson: failure paths need the same care as success paths. "Error" and "rejected" looked the same to the code, so an outage silently turned into lost data.
 - 74 tests passing.
+- **2026-09-29:** credits added. The 5:00 PM run was the first fully working run on the new code: 87 jobs scored, 84 rejected, **3 alerted** (Rhoda AI, SwingVision, Meta), 0 skipped for API errors.
