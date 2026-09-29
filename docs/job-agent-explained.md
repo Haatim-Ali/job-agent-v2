@@ -104,7 +104,7 @@ The Discord message is sent through a **webhook**: a secret URL that lets a scri
 
 | Reaction / command | What happens |
 |---|---|
-| ✅ | Runs `tailor.py` for that job: Claude Sonnet rewrites resume and cover letter content, LaTeX (`pdflatex`) compiles them into PDFs, and they're posted back to Discord |
+| ✅ | Runs `tailor.py` for that job: a tailored resume (see below) and a Claude-written cover letter, compiled to PDFs with LaTeX (`pdflatex`) and posted back to Discord |
 | 📨 | Logs the job in the `applications` table and fills in the Google Sheet |
 | ❌ | Asks why you're passing, then saves the reason to the `rejections` table |
 | `!applied <url> <Company> - <Role>` | Log an application found outside the bot |
@@ -112,6 +112,20 @@ The Discord message is sent through a **webhook**: a secret URL that lets a scri
 | `!tracker`, `!stats`, `!note` | Show the pipeline, show stats, add a note |
 
 **Why tailoring runs as a separate process:** generating and compiling documents takes a while. Running it in a separate process (through `run_in_executor`) keeps the bot responsive to other reactions in the meantime.
+
+## How resume tailoring works
+
+`ResumeTemplate.tex` **is** Haatim's real resume, typeset in LaTeX. Tailoring never regenerates it. It only makes small, checked edits to the 12 bullets in four sections (AIEA Lab, Website Developer, Pathwise, JobAgent). The header, education, camp-instructor bullets and "Additional" section are never touched.
+
+1. **Understand the job.** Claude reads the posting and lists must-haves and keywords.
+2. **Propose edits.** Claude sees the real bullets (with **bold** marked) plus the job description and may only: reorder bullets within a section, swap in the job's wording where it's *true*, and move bold emphasis. It runs at low temperature so results are consistent.
+3. **Mechanical checks** (`resume_tailor.validate_edit`), in code. An edit is thrown out if it: drops or invents a number, grows more than 5%, shrinks more than 30%, removes all bold, adds too much bold, breaks bold markup, adds an em dash, or adds/removes/merges a bullet.
+4. **Fact-check.** A second, independent Claude call (temperature 0) compares each edited bullet with the original and rejects anything the original doesn't support. Example it caught: calling Pathwise's "reasoning pipeline" a "data pipeline."
+5. **Layout guard.** The result is compiled and compared with the untouched resume. If it spills onto a second page or uses more text lines, the edit that grew the most is reverted, repeat until it fits the original's footprint.
+
+Every edit, rejection and reason is written to `/var/log/jobscout_tailor.log`. Result: the tailored resume is visually identical to the original; what changes is **which bullets lead** and a few job-relevant words.
+
+**Why so conservative?** An earlier version let Claude rewrite bullets freely from a knowledge base. It produced a generic summary line, loose spacing, lost bold, deleted strong bullets, and slipped in claims the candidate couldn't defend in an interview. A resume that reads as inflated does more harm than one that's merely untailored.
 
 ## The feedback loop (how it "learns")
 
@@ -180,4 +194,5 @@ It never touches the Contact or Resume Used columns. Failures are logged, not ra
 - Fixed: account errors (no credits, bad key) and temporary outages (rate limits, connection errors, server errors) now leave the job **unseen so the next run retries it**. After an account error the run stops calling Claude, and the bot posts one ⚠️ Discord warning per day. A one-off failure for a single job (e.g. Claude returns unreadable output) is still treated as a rejection, so no job can be retried forever.
 - Lesson: failure paths need the same care as success paths. "Error" and "rejected" looked the same to the code, so an outage silently turned into lost data.
 - 74 tests passing.
+- **2026-09-29: resume tailoring rebuilt.** Tailored resumes had a generic headline, loose bullet spacing (bullets inserted as `\\item` instead of the template's tighter `\\resitem`), no bold, deleted bullets, and wording drawn from the knowledge base instead of the real resume. Replaced with the baseline-preserving pipeline described in "How resume tailoring works", added `resume_tailor.py` and 19 tests (93 total), and synced the template's Campus Involvements line to the current resume. Old files backed up on the VPS at `~/job-scout-backup-2026-09-29-tailor/`.
 - **2026-09-29:** credits added. The 5:00 PM run was the first fully working run on the new code: 87 jobs scored, 84 rejected, **3 alerted** (Rhoda AI, SwingVision, Meta), 0 skipped for API errors.

@@ -27,6 +27,8 @@ from dotenv import load_dotenv
 import anthropic
 import discord
 
+import resume_tailor
+
 try:
     from pypdf import PdfReader
     HAS_PYPDF = True
@@ -95,27 +97,6 @@ def replace_section(tex, marker, new_content):
 
 # ── Template builders ──────────────────────────────────────────────────────────
 
-def build_resume_tex(data):
-    with open(RESUME_TEMPLATE, 'r', encoding='utf-8') as f:
-        tex = f.read()
-
-    resume   = data.get('resume', {})
-    headline = data.get('headline', '')
-
-    tex = replace_section(tex, 'TAGLINE',
-        f'    {{\\large {escape_latex(headline)}}} \\\\[5pt]')
-
-    if resume.get('aiea_bullets'):
-        tex = replace_section(tex, 'AIEA_BULLETS',
-            bullets_to_latex(resume['aiea_bullets']))
-
-    if resume.get('montessori_bullets'):
-        tex = replace_section(tex, 'MONTESSORI_BULLETS',
-            bullets_to_latex(resume['montessori_bullets']))
-
-    return tex
-
-
 def build_cover_tex(data):
     with open(COVER_TEMPLATE, 'r', encoding='utf-8') as f:
         tex = f.read()
@@ -174,39 +155,80 @@ def count_pages(pdf_path):
         return None
 
 
-def trim_to_one_page(data, slug, output_dir):
-    """
-    Iteratively drop the lowest-priority bullet (last in list) from the least
-    critical section until the resume compiles to exactly 1 page.
-    Priority order for trimming: Montessori > AIEA (most relevant, trimmed last).
-    """
-    resume = {k: list(v) for k, v in data.get('resume', {}).items()}
-    trim_order = ['montessori_bullets', 'aiea_bullets']
+def count_lines(pdf_path):
+    """Non-empty text lines on the PDF: a proxy for how full the page is."""
+    if not HAS_PYPDF or not pdf_path or not os.path.exists(pdf_path):
+        return None
+    try:
+        return sum(len([l for l in (p.extract_text() or "").splitlines() if l.strip()])
+                   for p in PdfReader(pdf_path).pages)
+    except Exception:
+        return None
 
-    for attempt in range(10):
-        tex = build_resume_tex({**data, 'resume': resume})
-        pdf = compile_pdf(tex, f'Resume_{slug}', output_dir)
+
+def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_description=""):
+    """
+    Tailor the baseline resume (ResumeTemplate.tex) with small validated edits only.
+    Layout guard: the result must stay on one page and use no more text lines than the
+    untouched baseline; otherwise the edits that grew the most are reverted one by one.
+    """
+    with open(RESUME_TEMPLATE, "r", encoding="utf-8") as f:
+        template = f.read()
+    originals = resume_tailor.extract_sections(template)
+
+    baseline_pdf = compile_pdf(template, f"_baseline_{slug}", output_dir)
+    baseline_lines = count_lines(baseline_pdf)
+    if baseline_pdf and os.path.exists(baseline_pdf):
+        os.remove(baseline_pdf)
+
+    edits = {}
+    try:
+        resp = client.messages.create(
+            model="claude-sonnet-4-6", max_tokens=3000, temperature=0.3,
+            messages=[{"role": "user", "content": resume_tailor.build_prompt(
+                originals, analysis, custom_prompt, job_description)}],
+        )
+        edits = parse_json_response(resp.content[0].text) or {}
+    except Exception as e:
+        logging.warning(f"Resume edit pass failed, using baseline resume: {e}")
+
+    # Independent truthfulness check on every changed bullet
+    pairs = resume_tailor.changed_pairs(originals, edits)
+    rejected = []
+    if pairs:
+        try:
+            verdict = parse_json_response(client.messages.create(
+                model="claude-sonnet-4-6", max_tokens=1000, temperature=0,
+                messages=[{"role": "user", "content": resume_tailor.build_verify_prompt(pairs)}],
+            ).content[0].text) or {}
+            rejected = [r for r in verdict.get("rejected", []) if isinstance(r, dict)]
+        except Exception as e:
+            # If the check can't run, don't trust the edits: fall back to the baseline wording
+            logging.warning(f"Truthfulness check failed, keeping original wording: {e}")
+            rejected = [{"id": i, "reason": "check unavailable"} for i, _, _ in pairs]
+        edits = resume_tailor.drop_rejected(originals, edits, {r.get("id") for r in rejected})
+
+    result, sources, changes = resume_tailor.apply_edits(originals, edits)
+    changes += [{"id": r.get("id"), "status": "rejected (fact-check)", "reason": r.get("reason")} for r in rejected]
+
+    for attempt in range(13):
+        tex = resume_tailor.render(template, result)
+        pdf = compile_pdf(tex, f"Resume_{slug}", output_dir)
         if pdf is None:
-            return None, tex
+            return None, tex, changes
+        pages, lines = count_pages(pdf), count_lines(pdf)
+        fits = (pages is None or pages <= 1) and (
+            baseline_lines is None or lines is None or lines <= baseline_lines)
+        if fits:
+            break
+        logging.info(f"Resume layout guard: {pages} page(s), {lines} lines vs baseline {baseline_lines}")
+        if not resume_tailor.revert_one(result, sources, originals, changes):
+            logging.warning("Layout guard: no edits left to revert")
+            break
 
-        pages = count_pages(pdf)
-        if pages is None or pages <= 1:
-            logging.info(f"Resume is 1 page after {attempt} trim(s)")
-            return pdf, tex
-
-        trimmed = False
-        for section in trim_order:
-            if len(resume.get(section, [])) > 1:
-                dropped = resume[section].pop()
-                logging.info(f"Trim {attempt+1}: dropped from {section}: \"{dropped[:60]}\"")
-                trimmed = True
-                break
-
-        if not trimmed:
-            logging.warning("No more bullets to trim -- resume may exceed 1 page")
-            return pdf, tex
-
-    return pdf, tex
+    for c in changes:
+        logging.info(f"Resume edit: {c}")
+    return pdf, tex, changes
 
 
 def trim_cover_to_one_page(data, slug, client, output_dir):
@@ -389,12 +411,10 @@ Return JSON only:
     custom_section = f"\nADDITIONAL INSTRUCTIONS FROM USER:\n{custom_prompt}\n" if custom_prompt else ""
     structured = parse_json_response(client.messages.create(
         model="claude-sonnet-4-6", max_tokens=3000,
-        messages=[{"role": "user", "content": f"""Generate a tailored application for {kb.get("personal", {}).get("name", "the candidate")} applying to {analysis.get("role_title")} at {analysis.get("company")}.
+        messages=[{"role": "user", "content": f"""Generate a tailored cover letter for {kb.get("personal", {}).get("name", "the candidate")} applying to {analysis.get("role_title")} at {analysis.get("company")}.
 
 RULES:
 - Only use real experience from the KB. Never fabricate metrics or responsibilities.
-- Bullets must be plain text (no LaTeX). Reword KB bullets for relevance.
-- Order bullets most-important-first so lower-priority ones can be cut for page length.
 - Cover letter: 3 tight paragraphs, story-led, specific to this company.
 - Voice: direct, enthusiastic, technically literate but people-first. No corporate fluff.
 - No em dashes anywhere. Use commas or periods instead.
@@ -407,11 +427,6 @@ KB:
 
 Return JSON only:
 {{
-  "headline": "tailored one-line resume tagline",
-  "resume": {{
-    "aiea_bullets": ["3-5 bullets, most relevant first"],
-    "montessori_bullets": ["1-2 bullets, most relevant first"]
-  }},
   "cover_letter": {{
     "date": "{today}",
     "paragraph_1": "...",
@@ -431,14 +446,14 @@ Return JSON only:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     # ── Build + compile ───────────────────────────────────────────────────────
-    resume_pdf, _ = trim_to_one_page(structured, slug, OUTPUT_DIR)
+    resume_pdf, resume_tex, resume_changes = tailor_resume(client, analysis, custom_prompt, slug, OUTPUT_DIR, job_description)
     cover_pdf      = trim_cover_to_one_page(structured, slug, client, OUTPUT_DIR)
 
     # Fallback: save .tex files if pdflatex unavailable
     if resume_pdf is None:
         path = os.path.join(OUTPUT_DIR, f'Resume_{slug}.tex')
         with open(path, 'w', encoding='utf-8') as f:
-            f.write(build_resume_tex(structured))
+            f.write(resume_tex)
         logging.warning(f"Resume PDF failed -- .tex saved to {path}")
 
     if cover_pdf is None:
