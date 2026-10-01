@@ -504,7 +504,7 @@ Pending state lives in two Python dictionaries in memory, `pending_requests` and
 
 ### A short LaTeX primer
 
-**LaTeX** is a typesetting language: you write plain text with commands, and a compiler lays it out into a PDF with professional typography. `ResumeTemplate.tex` **is** your resume. It compiles line for line to `Haatim_Ali_Resume.pdf`.
+**LaTeX** is a typesetting language: you write plain text with commands, and a compiler lays it out into a PDF with professional typography. `ResumeTemplate.tex` **is** your resume. It compiles line for line to `Haatim_Ali_Resume.pdf`, with one deliberate difference since 2026-10-01: the header's city is Fremont, CA instead of San Jose. If you update your own PDF, update the template to match (and vice versa).
 
 - The **preamble** (everything before `\begin{document}`) loads packages (`times` for the Times font, `hyperref` for clickable links) and sets margins.
 - **Macros** are reusable commands the template defines. For example, `\newcommand{\resitem}[1]{\item #1 \vspace{-6pt}}` defines `\resitem{...}` as "a bullet, then pull the next line up 6 points." That negative space is what makes your resume tight; bullets inserted as a plain `\item` look loose (a past bug).
@@ -615,6 +615,16 @@ One call to the draft model (`build_answer_prompt`, `max_tokens=16000`) receives
 - Essays follow `essay_style` (60 to 150 words, one concrete project tied to something specific in the job) and **may not claim personal experiences or opinions that aren't in the knowledge base**. This rule was added after the first test packet said "Figma is one of the few products I actually use."
 - No em dashes, en dashes or `--`.
 - A fact the knowledge base doesn't contain (GPA, age) gets `null` and is listed as unknown. **No guessing.**
+- **Disclosures and attestations** (conflicts of interest, relationships with company employees, ties to government officials, background checks, criminal history, non-competes) are answered **only** from `application_answers.yaml`. If the saved answers don't cover the question, it's left blank and listed for you. These are legal statements you're signing, so they're never inferred from the knowledge base or the job description. Added 2026-10-01 after Robinhood's form asked several.
+
+### Which contact details go where
+
+| Where | Name | Email | Location |
+|---|---|---|---|
+| Resume and cover letter header (`ResumeTemplate.tex`, `CoverLetterTemplate.tex`) | Haatim Ali | personal Gmail | Fremont, CA |
+| Application form fields (`application_answers.yaml`) | Haatim / Ali; **Haatim Tahir Ali** where a form asks for the name on a government ID | **UCSC school email** | Fremont, CA (city fields pick "Fremont, California, United States") |
+
+Because forms use the school email and documents use the Gmail address, recruiters may reply to either, so check both. The values live in `application_answers.yaml` on the VPS, which is kept out of git; `application_answers.yaml.example` shows the shape.
 
 ### Validating the answers in code
 
@@ -975,6 +985,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-01 (evening): status check and doc audit.** The VPS runs commit `4060f85`, matching the private repo. In the day's 23 scraper runs it alerted **38 jobs**, with a few one-off connection timeouts to Greenhouse/Lever boards that were skipped and retried on the next run (expected "fail soft" behavior). Application queue: **5 submitted** (Figma, Waymo, Muon Space, Pinterest, Robinhood), 3 ready (Trajectory, Quadric AI Kernel Engineer, Rhoda AI), others being prepared or skipped. Doc updates: disclosure-question rule, which contact details go on documents vs forms, and the resume template's one deliberate difference from `Haatim_Ali_Resume.pdf` (Fremont).
 
 **2026-10-01: location is Fremont, CA.** Resume and cover letter headers, `experience_kb.yaml`, `application_answers.yaml` and the form filler's city field changed from San Jose to Fremont. Job search locations are unchanged. Robinhood (Data Science Intern) was submitted with San Jose just before the change.
 
