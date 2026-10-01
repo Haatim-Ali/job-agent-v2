@@ -233,3 +233,10 @@ class TestNewSources:
     def test_parse_dt_epoch_seconds_and_ms(self):
         assert cs._parse_dt(1790812800).year == 2026
         assert cs._parse_dt(1790812800000).year == 2026
+
+
+def test_new_grad_titles_are_not_internships():
+    # Regression: "university" counted as an internship keyword, so Pinterest's full-time
+    # "University Grad Software Engineer 2027 (USA)" got an application packet
+    assert not _match("University Grad Software Engineer 2027 (USA)")
+    assert _match("Software Engineer Intern 2027 (USA)")

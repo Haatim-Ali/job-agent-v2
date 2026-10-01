@@ -976,6 +976,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 
 # Changelog
 
+**2026-10-01: "university" removed from the internship keywords.** It let Pinterest's full-time "University Grad Software Engineer 2027" through the title filter and into the packet queue (skipped). Regression test added.
+
 **2026-10-01: more sources, Claude upgrades, watcher.** SimplifyJobs Summer 2027 list, Workday (NVIDIA) and SmartRecruiters adapters, and `learned_boards` (boards of alerted jobs are checked directly from then on). `claude_json.py`: structured outputs on every Claude call (form answers pinned to real question keys and options), the knowledge base as a shared cached system block (2 cache hits per packet), drafting moved to Sonnet 5.5 after a side-by-side test, refusal fallback to Sonnet 4.6. Watch mode for `/submit-applications` plus `apply_prep.py --notify` / `--ready-json`. Batches API considered and skipped (up to 24-hour latency for small savings).
 
 **2026-10-01: reliability.** Scraper watchdog (`heartbeat.py`: bot warns in Discord after 75 minutes without a finished run; optional healthchecks.io), `flock` so runs can't overlap, nightly consistent database backups (`backup_db.py`, 14 kept), SQLite WAL mode, log rotation (`/etc/logrotate.d/jobscout`; the 32 MB scraper log was rotated), pinned `requirements.txt`, the VPS converted to a git checkout of the private repo (read-only deploy key) with `deploy.sh` (tests on the VPS, automatic rollback), GitHub Actions CI, rewritten `CLAUDE.md` and README, and `.env.save` (live bot token) removed from tracking. 162 tests passing.
