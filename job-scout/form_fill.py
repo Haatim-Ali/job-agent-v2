@@ -26,7 +26,7 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 ANSWERS_PATH = os.path.join(SCRIPT_DIR, "application_answers.yaml")
 
 FIRST_NAME, LAST_NAME = "Haatim", "Ali"
-LOCATION_SEARCH, LOCATION_PICK = "San Jose", "San Jose, California, United States"
+LOCATION_SEARCH, LOCATION_PICK = "Fremont", "Fremont, California, United States"
 
 
 def application_email(path=ANSWERS_PATH):

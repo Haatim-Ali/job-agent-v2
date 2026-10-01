@@ -56,7 +56,7 @@ def test_dropdowns_pick_exact_option():
     assert any('"question_2"' in t for t in texts)
     assert 'await __f.pick("No")' in texts
     assert 'await __f.pick("Asian")' in texts
-    assert 'await __f.pick("San Jose, California, United States")' in texts
+    assert 'await __f.pick("Fremont, California, United States")' in texts
 
 
 def test_agreements_are_held_back_for_approval():

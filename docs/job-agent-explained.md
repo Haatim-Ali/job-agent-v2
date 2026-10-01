@@ -976,6 +976,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 
 # Changelog
 
+**2026-10-01: location is Fremont, CA.** Resume and cover letter headers, `experience_kb.yaml`, `application_answers.yaml` and the form filler's city field changed from San Jose to Fremont. Job search locations are unchanged. Robinhood (Data Science Intern) was submitted with San Jose just before the change.
+
 **2026-10-01: Ashby packets fixed.** The Ashby form query asked for a field Ashby doesn't have (`descriptionPlainText`); Ashby rejected the query and the code read the error as "no questions," so 5 packets were built with an empty question list. The description now comes from the public job-board feed, and a query error or an empty form now fails the packet instead of passing silently. The 5 packets were rebuilt.
 
 **2026-10-01: duplicate packets fixed.** The queue now compares posting IDs, not links (Rhoda AI had been queued twice via Simplify's and Ashby's different link forms).
