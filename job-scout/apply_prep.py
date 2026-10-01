@@ -98,9 +98,42 @@ def _now():
     return datetime.now(timezone.utc).isoformat()
 
 
+_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+
+
+def posting_key(url):
+    """The posting's identity regardless of link form: the Lever/Ashby posting UUID, else the
+    Greenhouse job number (gh_jid or /jobs/<n>), else the URL without query or /apply suffix.
+    e.g. jobs.ashbyhq.com/x/<uuid>/application?embed=true and jobs.ashbyhq.com/x/<uuid> match."""
+    url = str(url or "")
+    m = _UUID.search(url.lower())
+    if m:
+        return m.group(0)
+    m = re.search(r"gh_jid=(\d+)", url) or re.search(r"/jobs/(\d{5,})", url)
+    if m:
+        return "gh:" + m.group(1)
+    return re.sub(r"/(application|apply)/?$", "", url.split("?")[0].split("#")[0].rstrip("/"))
+
+
+def already_known(conn, job_url):
+    """True if this posting is already queued (any status) or logged as applied."""
+    key = posting_key(job_url)
+    for table in ("apply_queue", "applications"):
+        try:
+            urls = [r[0] for r in conn.execute(f"SELECT job_url FROM {table}")]
+        except sqlite3.OperationalError:
+            continue   # table not created yet
+        if any(posting_key(u) == key for u in urls):
+            return True
+    return False
+
+
 def enqueue(conn, job, fit_score=None):
-    """Add an alerted career-site job to the queue. Returns True if newly added."""
+    """Add an alerted career-site job to the queue. Returns True if newly added; False if it's
+    unsupported or the same posting is already queued or applied to (under any link form)."""
     if job.get("site") not in SUPPORTED_ATS or not job.get("job_url"):
+        return False
+    if already_known(conn, job["job_url"]):
         return False
     cur = conn.execute(
         """INSERT OR IGNORE INTO apply_queue

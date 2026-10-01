@@ -568,7 +568,7 @@ stateDiagram-v2
   failed --> queued: --url rebuilds it
 ```
 
-`enqueue` uses `INSERT OR IGNORE`, so a job already in the queue is left alone. At the end of each scraper run, the scraper starts `apply_prep.py --pending 3` **as a separate process** with a 20-minute timeout. It takes the 3 queued jobs with the highest fit score. Separate process, for two reasons: tailoring is slow, and `tailor.py` configures logging when it's imported, which would otherwise hijack the scraper's log file.
+`enqueue` skips a job if the same **posting** is already queued (any status) or logged as applied, comparing `posting_key` rather than raw links: the Lever/Ashby posting UUID or the Greenhouse job number. The same job often arrives under different links (Simplify's `.../application?embed=true` vs Ashby's plain link, a company site's `?gh_jid=` vs `job-boards.greenhouse.io/.../jobs/<n>`), which once queued Rhoda AI twice. At the end of each scraper run, the scraper starts `apply_prep.py --pending 3` **as a separate process** with a 20-minute timeout. It takes the 3 queued jobs with the highest fit score. Separate process, for two reasons: tailoring is slow, and `tailor.py` configures logging when it's imported, which would otherwise hijack the scraper's log file.
 
 LinkedIn alerts are queued too when the same role is found on the company's own board (next section). Only jobs alerted **after** this feature was deployed (2026-09-30) are queued; the tens of thousands already in `seen_jobs` are never re-examined. `apply_prep.py --url <posting>` builds a packet for any Greenhouse, Lever or Ashby posting on demand.
 
@@ -975,6 +975,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-01: duplicate packets fixed.** The queue now compares posting IDs, not links (Rhoda AI had been queued twice via Simplify's and Ashby's different link forms).
 
 **2026-10-01: "university" removed from the internship keywords.** It let Pinterest's full-time "University Grad Software Engineer 2027" through the title filter and into the packet queue (skipped). Regression test added.
 

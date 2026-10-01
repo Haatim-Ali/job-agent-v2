@@ -390,3 +390,32 @@ def test_ready_packets_lists_only_ready(tmp_path, monkeypatch):
         ap.set_status(conn, n, status, packet_dir=f"/x/packets/{n}-intern", note="complete")
     assert ap.ready_packets(conn) == [{"job_url": "a", "company": "A", "title": "Intern",
                                        "packet": "a-intern", "note": "complete"}]
+
+
+class TestPostingKey:
+    @pytest.mark.parametrize("a, b", [
+        ("https://jobs.ashbyhq.com/rhoda-ai/9a57c8ff-dd2b-4547-a46a-44658a699ba5/application?embed=true",
+         "https://jobs.ashbyhq.com/rhoda-ai/9a57c8ff-dd2b-4547-a46a-44658a699ba5"),
+        ("https://careers.withwaymo.com/jobs?gh_jid=8238525", "https://job-boards.greenhouse.io/waymo/jobs/8238525"),
+        ("https://jobs.lever.co/palantir/774cf5c9-bf6a-4d77-bf60-d50ef1beb1a0/apply",
+         "https://jobs.lever.co/palantir/774cf5c9-bf6a-4d77-bf60-d50ef1beb1a0"),
+    ])
+    def test_same_posting_same_key(self, a, b):
+        assert ap.posting_key(a) == ap.posting_key(b)
+
+    def test_different_postings_differ(self):
+        assert ap.posting_key("https://boards.greenhouse.io/x/jobs/1111111") != \
+            ap.posting_key("https://boards.greenhouse.io/x/jobs/2222222")
+
+    def test_enqueue_skips_duplicates_and_applied(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(ap, "DB_PATH", str(tmp_path / "jobs.db"))
+        conn = ap.db_conn()
+        conn.execute("CREATE TABLE applications (job_url TEXT PRIMARY KEY, title TEXT, company TEXT,"
+                     " status TEXT, date_added TEXT, notes TEXT)")
+        conn.execute("INSERT INTO applications (job_url) VALUES ('https://careers.withwaymo.com/jobs?gh_jid=8238525')")
+        u = "9a57c8ff-dd2b-4547-a46a-44658a699ba5"
+        assert ap.enqueue(conn, {"job_url": f"https://jobs.ashbyhq.com/rhoda-ai/{u}", "site": "ashby"})
+        assert not ap.enqueue(conn, {"job_url": f"https://jobs.ashbyhq.com/rhoda-ai/{u}/application?embed=true",
+                                     "site": "ashby"})
+        assert not ap.enqueue(conn, {"job_url": "https://job-boards.greenhouse.io/waymo/jobs/8238525",
+                                     "site": "greenhouse", "board": "waymo"})
