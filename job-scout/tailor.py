@@ -28,6 +28,8 @@ import anthropic
 import discord
 
 import resume_tailor
+from claude_json import (DRAFT_MODEL, ClaudeJSONError, ask_json, obj, arr, STR, cached_system,
+                         kb_system_text)
 
 try:
     from pypdf import PdfReader
@@ -182,13 +184,12 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
         os.remove(baseline_pdf)
 
     edits = {}
+    edit_schema = obj({m: arr(obj({"id": {"type": "string", "enum": [f"{m}-{i}" for i in range(len(b))]},
+                                   "text": STR}))
+                       for m, b in originals.items()})
     try:
-        resp = client.messages.create(
-            model="claude-sonnet-4-6", max_tokens=3000, temperature=0.3,
-            messages=[{"role": "user", "content": resume_tailor.build_prompt(
-                originals, analysis, custom_prompt, job_description)}],
-        )
-        edits = parse_json_response(resp.content[0].text) or {}
+        edits = ask_json(client, resume_tailor.build_prompt(originals, analysis, custom_prompt, job_description),
+                         edit_schema, max_tokens=3000, temperature=0.3)
     except Exception as e:
         logging.warning(f"Resume edit pass failed, using baseline resume: {e}")
 
@@ -197,10 +198,9 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
     rejected = []
     if pairs:
         try:
-            verdict = parse_json_response(client.messages.create(
-                model="claude-sonnet-4-6", max_tokens=1000, temperature=0,
-                messages=[{"role": "user", "content": resume_tailor.build_verify_prompt(pairs)}],
-            ).content[0].text) or {}
+            verdict = ask_json(client, resume_tailor.build_verify_prompt(pairs),
+                               obj({"rejected": arr(obj({"id": STR, "reason": STR}))}),
+                               max_tokens=1000, temperature=0)
             rejected = [r for r in verdict.get("rejected", []) if isinstance(r, dict)]
         except Exception as e:
             # If the check can't run, don't trust the edits: fall back to the baseline wording
@@ -243,9 +243,7 @@ def trim_cover_to_one_page(data, slug, client, output_dir):
 
     logging.info("Cover letter exceeds 1 page -- asking Claude to shorten")
     try:
-        resp = client.messages.create(
-            model="claude-sonnet-4-6", max_tokens=1500,
-            messages=[{"role": "user", "content": f"""This cover letter is slightly over one page. Shorten each paragraph by removing unnecessary sentences while keeping the core story, voice, and logistics line intact. No em dashes. Return JSON only:
+        shorter = ask_json(client, f"""This cover letter is slightly over one page. Shorten each paragraph by removing unnecessary sentences while keeping the core story, voice, and logistics line intact. No em dashes. Return JSON only:
 
 {{
   "date": "{cl.get('date', '')}",
@@ -257,9 +255,7 @@ def trim_cover_to_one_page(data, slug, client, output_dir):
 Current paragraphs:
 P1: {cl.get('paragraph_1', '')}
 P2: {cl.get('paragraph_2', '')}
-P3: {cl.get('paragraph_3', '')}"""}]
-        )
-        shorter = parse_json_response(resp.content[0].text)
+P3: {cl.get('paragraph_3', '')}""", COVER_SCHEMA, max_tokens=1500)
         if shorter:
             updated = {**data, 'cover_letter': shorter}
             cover_tex = build_cover_tex(updated)
@@ -359,12 +355,22 @@ def parse_json_response(text):
         return {}
 
 
+GAPS_SCHEMA = arr(obj({"gap": STR, "talking_point": STR}))
+COVER_SCHEMA = obj({"date": STR, "paragraph_1": STR, "paragraph_2": STR, "paragraph_3": STR})
+ANALYSIS_SCHEMA = obj({
+    "role_title": STR, "company": STR, "company_slug": STR,
+    "must_have": arr(STR), "nice_to_have": arr(STR), "ats_keywords": arr(STR),
+    "tone": {"type": "string", "enum": ["formal", "startup", "technical", "sales-focused"]},
+})
+MATCHING_SCHEMA = obj({"lead_experience": STR, "cover_letter_angle": STR, "gaps": GAPS_SCHEMA})
+
+
 # ── Core tailor ────────────────────────────────────────────────────────────────
 
 def tailor(job_url, job_description=None, custom_prompt=""):
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     kb     = load_kb()
-    kb_str = yaml.dump(kb, default_flow_style=False)
+    kb_system = cached_system(kb_system_text(kb))
 
     if not job_description:
         logging.info(f"Fetching JD from {job_url}")
@@ -374,79 +380,61 @@ def tailor(job_url, job_description=None, custom_prompt=""):
 
     # ── Pass 1: Analyze JD ────────────────────────────────────────────────────
     logging.info("Pass 1: Analyzing JD")
-    analysis = parse_json_response(client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=800,
-        messages=[{"role": "user", "content": f"""Analyze this job description. Return JSON only.
+    try:
+        analysis = ask_json(client, f"""Analyze this job description.
 
 {job_description[:5000]}
 
-{{
-  "role_title": "exact job title",
-  "company": "company name",
-  "company_slug": "lowercase-hyphenated for filenames",
-  "must_have": ["3-5 required quals"],
-  "nice_to_have": ["2-3 preferred quals"],
-  "ats_keywords": ["12-15 keywords to include"],
-  "tone": "formal | startup | technical | sales-focused"
-}}"""}]
-    ).content[0].text)
-    if not analysis:
+role_title: the exact job title. company: the company name. company_slug: lowercase-hyphenated,
+for filenames. must_have: 3-5 required qualifications. nice_to_have: 2-3 preferred ones.
+ats_keywords: 12-15 keywords an applicant tracking system would scan for. tone: the posting's voice.""",
+            ANALYSIS_SCHEMA, max_tokens=800)
+    except (ClaudeJSONError, anthropic.APIError, ValueError) as e:
+        logging.warning(f"Pass 1 failed, using defaults: {e}")
         analysis = {"role_title": "Role", "company": "Company", "company_slug": "company"}
 
     # ── Pass 2: Match experience ──────────────────────────────────────────────
     logging.info("Pass 2: Matching experience")
-    matching = parse_json_response(client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=1000,
-        messages=[{"role": "user", "content": f"""Match the candidate's experience to this job. Only use facts from the KB.
-
-KB:
-{kb_str}
+    try:
+        matching = ask_json(client, f"""Match the candidate's experience (in the knowledge base) to this job.
 
 Role: {analysis.get("role_title")} at {analysis.get("company")}
 Must have: {json.dumps(analysis.get("must_have", []))}
 ATS keywords: {json.dumps(analysis.get("ats_keywords", []))}
 
-Return JSON only:
-{{
-  "lead_experience": "which experience -- AIEA Lab or Montessori -- best fits this role and why",
-  "cover_letter_angle": "one specific story that best fits this role",
-  "gaps": [{{"gap": "requirement", "talking_point": "how to address it"}}]
-}}"""}]
-    ).content[0].text)
-    if not matching:
+lead_experience: which experience (AIEA Lab or Montessori) best fits this role, and why.
+cover_letter_angle: one specific story that best fits this role.
+gaps: requirements the candidate doesn't clearly meet, each with a talking point.""",
+            MATCHING_SCHEMA, max_tokens=1000, system=kb_system)
+    except (ClaudeJSONError, anthropic.APIError, ValueError) as e:
+        logging.warning(f"Pass 2 failed, continuing without it: {e}")
         matching = {"cover_letter_angle": "", "gaps": []}
 
     # ── Pass 3: Generate structured content ───────────────────────────────────
     logging.info("Pass 3: Generating content")
     today = datetime.now().strftime("%B %d, %Y")
     custom_section = f"\nADDITIONAL INSTRUCTIONS FROM USER:\n{custom_prompt}\n" if custom_prompt else ""
-    structured = parse_json_response(client.messages.create(
-        model="claude-sonnet-4-6", max_tokens=3000,
-        messages=[{"role": "user", "content": f"""Generate a tailored cover letter for {kb.get("personal", {}).get("name", "the candidate")} applying to {analysis.get("role_title")} at {analysis.get("company")}.
+    try:
+        structured = ask_json(client, f"""Write a tailored cover letter for {kb.get("personal", {}).get("name", "the candidate")} applying to {analysis.get("role_title")} at {analysis.get("company")}.
 
 RULES:
-- Only use real experience from the KB. Never fabricate metrics or responsibilities.
+- Only use real experience from the knowledge base. Never fabricate metrics or responsibilities.
 - Cover letter: 3 tight paragraphs, story-led, specific to this company.
 - Voice: direct, enthusiastic, technically literate but people-first. No corporate fluff.
 - No em dashes anywhere. Use commas or periods instead.
 - Paragraph 3 must include a logistics line (location, availability, eager to connect).
+- The date is {today}.
 {custom_section}
 Context: {json.dumps(analysis)}
 Matching: {json.dumps(matching)}
-KB:
-{kb_str[:3500]}
 
-Return JSON only:
-{{
-  "cover_letter": {{
-    "date": "{today}",
-    "paragraph_1": "...",
-    "paragraph_2": "...",
-    "paragraph_3": "..."
-  }},
-  "gaps": [{{"gap": "...", "talking_point": "..."}}]
-}}"""}]
-    ).content[0].text)
+Also list gaps (requirement + talking point).""",
+            {"type": "object", "properties": {"cover_letter": COVER_SCHEMA, "gaps": GAPS_SCHEMA},
+             "required": ["cover_letter", "gaps"], "additionalProperties": False},
+            max_tokens=3000, system=kb_system)
+    except (ClaudeJSONError, anthropic.APIError, ValueError) as e:
+        logging.error(f"Pass 3 failed: {e}")
+        structured = None
 
     if not structured:
         logging.error("Pass 3 returned no parseable JSON")

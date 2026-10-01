@@ -46,7 +46,7 @@ BOT_TOKEN    = os.getenv("DISCORD_BOT_TOKEN")
 APPLY_CHANNEL_ID = os.getenv("APPLICATIONS_CHANNEL_ID")  # #applications: packet-ready + applied notices
 DISCORD_USER_ID  = os.getenv("DISCORD_USER_ID")
 DEFAULT_RESUME   = "General/default resume"
-MODEL        = "claude-sonnet-4-6"
+from claude_json import DRAFT_MODEL as MODEL
 HEADERS      = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"}
 TIMEOUT      = 20
 MAX_OPTIONS  = 60   # longer option lists (e.g. every university) aren't sent to Claude
@@ -496,8 +496,7 @@ numbers, employers, or skills.
 
 STANDARD ANSWERS (use these for matching questions):
 {yaml.dump(standard, default_flow_style=False, allow_unicode=True)}
-CANDIDATE KNOWLEDGE BASE:
-{yaml.dump(kb, default_flow_style=False, allow_unicode=True)[:6000]}
+(The candidate knowledge base is in the system prompt.)
 
 JOB: {job.get("title")} at {job.get("company")}
 JOB DESCRIPTION (excerpt):
@@ -529,20 +528,44 @@ RULES:
   (e.g. GPA, age, a specific certification), answer null and list its key in "unknown".
   Do not guess.
 
-Return JSON only:
-{{"answers": {{"<key>": <value or null>}}, "unknown": ["<key>", ...]}}"""
+Put every question's answer under its key in "answers" (null where you have no real
+answer), and list the keys of questions you couldn't answer from the facts in "unknown"."""
+
+
+def answer_schema(questions):
+    """Structured-output schema with one property per question, so every answer is under a
+    real question key and every dropdown answer is one of that question's actual options
+    (long searchable lists like every university are free text instead)."""
+    props = {}
+    for q in questions:
+        if q["type"] == "file":
+            continue
+        opts = q["options"] if 0 < len(q["options"]) <= MAX_OPTIONS else []
+        if q["type"] == "select" and opts:
+            value = {"type": "string", "enum": opts}
+        elif q["type"] == "multiselect" and opts:
+            value = {"type": "array", "items": {"type": "string", "enum": opts}}
+        elif q["type"] == "multiselect":
+            value = {"type": "array", "items": {"type": "string"}}
+        else:
+            value = {"type": "string"}
+        props[q["key"]] = {"anyOf": [value, {"type": "null"}]}
+    return {"type": "object", "additionalProperties": False, "required": ["answers", "unknown"],
+            "properties": {
+                "answers": {"type": "object", "properties": props, "required": list(props),
+                            "additionalProperties": False},
+                "unknown": {"type": "array", "items": {"type": "string", "enum": list(props) or [""]}},
+            }}
 
 
 def draft_answers(job, form, client=None):
     import anthropic
+    from claude_json import ask_json, cached_system, kb_system_text
     client = client or anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
     kb = yaml.safe_load(open(KB_PATH))
     standard = yaml.safe_load(open(ANSWERS_PATH))
-    msg = client.messages.create(
-        model=MODEL, max_tokens=4000,
-        messages=[{"role": "user", "content": build_answer_prompt(job, form, kb, standard)}],
-    )
-    result = parse_json(msg.content[0].text)
+    result = ask_json(client, build_answer_prompt(job, form, kb, standard), answer_schema(form["questions"]),
+                      model=MODEL, max_tokens=4000, system=cached_system(kb_system_text(kb)))
     result["answers"] = {k: strip_dashes(v) for k, v in (result.get("answers") or {}).items()}
     return validate_answers(form["questions"], result.get("answers") or {}, result.get("unknown") or [])
 

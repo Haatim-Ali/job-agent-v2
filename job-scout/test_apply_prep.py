@@ -3,6 +3,7 @@ Tests for apply_prep.py: form resolution helpers, answer validation and the queu
 Run with: python -m pytest job-scout/test_apply_prep.py -v
 """
 
+import json
 import sqlite3
 
 import pytest
@@ -342,3 +343,40 @@ def test_learned_boards_merge_into_config(tmp_path, monkeypatch):
     merged = ap.with_learned_boards(cfg, conn)
     assert merged["ashby"] == ["openai", "claylabs"] and merged["greenhouse"] == ["figma", "stripe"]
     assert cfg["ashby"] == ["openai"]   # config itself untouched
+
+
+def test_answer_schema_pins_keys_and_options():
+    schema = ap.answer_schema(QUESTIONS)
+    props = schema["properties"]["answers"]["properties"]
+    assert "resume" not in props                                        # files aren't answered
+    assert props["auth"]["anyOf"][0] == {"type": "string", "enum": ["Yes", "No"]}
+    assert props["langs"]["anyOf"][0]["items"]["enum"] == ["English", "Spanish"]
+    assert props["school"]["anyOf"][0] == {"type": "string"}            # 100 options: free text
+    assert {"type": "null"} in props["gpa"]["anyOf"]
+    assert schema["properties"]["unknown"]["items"]["enum"] == list(props)
+
+
+def test_draft_answers_sends_schema_and_cached_kb(tmp_path, monkeypatch):
+    sent = {}
+
+    class Messages:
+        def create(self, **kw):
+            sent.update(kw)
+
+            class R:
+                stop_reason = "end_turn"
+                content = [type("B", (), {"type": "text", "text": json.dumps({
+                    "answers": {"first_name": "Haatim", "auth": "Yes", "langs": None, "gpa": None,
+                                "nickname": None, "school": "UC Santa Cruz",
+                                "q_essay": "I built Pathwise -- an agent — in 24 hours, shipped end to end."},
+                    "unknown": ["gpa"]})})()]
+            return R()
+
+    client = type("C", (), {"messages": Messages()})()
+    form = {"questions": QUESTIONS + [ap._q("q_essay", "Why us?", "textarea", True)], "description": "JD"}
+    answers, flagged = ap.draft_answers({"title": "SWE Intern", "company": "Figma"}, form, client=client)
+    assert answers["auth"] == "Yes" and "--" not in answers["q_essay"] and "—" not in answers["q_essay"]
+    assert flagged == ["gpa"]
+    assert sent["output_config"]["format"]["type"] == "json_schema"
+    assert sent["system"][0]["cache_control"] == {"type": "ephemeral"}
+    assert "CANDIDATE KNOWLEDGE BASE" in sent["system"][0]["text"]

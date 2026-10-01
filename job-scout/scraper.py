@@ -22,6 +22,7 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 import anthropic
 
 import career_sites
+from claude_json import SCORE_MODEL, ask_json, obj, BOOL, INT, STR
 import apply_prep
 import heartbeat
 
@@ -323,6 +324,10 @@ def notify_api_problem(error):
         logging.warning(f"Could not send API problem alert: {e}")
 
 
+SCORE_SCHEMA = obj({"relevant": BOOL, "reason": STR, "fit_score": INT,
+                    "experience_required": STR, "location_ok": BOOL})
+
+
 def claude_relevance_check(job):
     global _claude_unavailable
     if _claude_unavailable:
@@ -353,27 +358,13 @@ Company: {job.get("company")}
 Location: {job.get("location")}
 Description (first 3500 chars): {str(job.get("description") or "")[:3500]}
 
-Respond with JSON only:
-{{
-  "relevant": true or false,
-  "reason": "one sentence max",
-  "fit_score": 1 to 10,
-  "experience_required": "e.g. 0-1 years or 5+ years",
-  "location_ok": true or false
-}}"""
+Answer with: relevant (true/false), reason (one sentence max), fit_score (1 to 10),
+experience_required (e.g. "0-1 years" or "5+ years"), location_ok (true/false)."""
 
     try:
-        response = client.messages.create(
-            model="claude-haiku-4-5-20251001",
-            max_tokens=200,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        text = response.content[0].text.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        return json.loads(text.strip())
+        result = ask_json(client, prompt, SCORE_SCHEMA, model=SCORE_MODEL, max_tokens=300)
+        result["fit_score"] = max(1, min(10, int(result["fit_score"])))   # schemas can't enforce ranges
+        return result
     except Exception as e:
         logging.warning(f"Claude check failed: {e}")
         # Account-level problems (no credits, bad key) will fail every call: stop trying this run

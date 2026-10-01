@@ -138,11 +138,36 @@ class TestClaudeUnavailable:
         for n in (1, 2, 3):
             assert not scraper.is_seen(conn, f"https://x/{n}")   # kept for retry
 
+    def test_score_uses_structured_output_and_clamps(self, scraper, monkeypatch):
+        sent = {}
+
+        class FakeMessages:
+            def create(self, **kw):
+                sent.update(kw)
+
+                class R:
+                    stop_reason = "end_turn"
+                    content = [type("C", (), {"type": "text", "text":
+                        '{"relevant": true, "reason": "fits", "fit_score": 14, '
+                        '"experience_required": "0-1 years", "location_ok": true}'})()]
+                return R()
+
+        class FakeClient:
+            def __init__(self, **kw):
+                self.messages = FakeMessages()
+
+        monkeypatch.setattr(scraper.anthropic, "Anthropic", FakeClient)
+        result = scraper.claude_relevance_check(self._job(5))
+        assert result["fit_score"] == 10 and result["relevant"]
+        fmt = sent["output_config"]["format"]
+        assert fmt["type"] == "json_schema" and fmt["schema"]["required"][0] == "relevant"
+
     def test_one_off_parse_failure_is_still_marked_seen(self, scraper, monkeypatch):
         class FakeMessages:
             def create(self, **kw):
                 class R:
-                    content = [type("C", (), {"text": "not json"})()]
+                    stop_reason = "end_turn"
+                    content = [type("C", (), {"type": "text", "text": "not json"})()]
                 return R()
 
         class FakeClient:
