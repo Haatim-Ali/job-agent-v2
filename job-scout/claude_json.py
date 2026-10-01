@@ -17,7 +17,11 @@ import os
 
 # Writing and judgment calls (tailoring, cover letters, form answers).
 # CLAUDE_DRAFT_MODEL in the environment overrides it (used to compare models side by side).
-DRAFT_MODEL = os.getenv("CLAUDE_DRAFT_MODEL", "claude-sonnet-4-6")
+# Sonnet 5.5 chosen 2026-10-01 after a side-by-side on the Waymo packet: same (correct) form
+# answers, a more concrete and less inflated cover letter, faster and cheaper per token.
+DRAFT_MODEL = os.getenv("CLAUDE_DRAFT_MODEL", "claude-sonnet-5-5")
+# If the draft model declines a request (stop_reason "refusal"), retry once on this one
+FALLBACK_MODEL = "claude-sonnet-4-6"
 # High-volume yes/no scoring
 SCORE_MODEL = "claude-haiku-4-5-20251001"
 
@@ -57,7 +61,7 @@ def cached_system(text):
     return [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
 
 
-def ask_json(client, prompt, schema, *, model=DRAFT_MODEL, max_tokens=4000, system=None,
+def ask_json(client, prompt, schema, *, model=DRAFT_MODEL, max_tokens=16000, system=None,
              temperature=None):
     """Send one prompt, get back a dict guaranteed to match `schema`.
     Raises ClaudeJSONError on a refusal or a reply cut off by max_tokens."""
@@ -70,6 +74,10 @@ def ask_json(client, prompt, schema, *, model=DRAFT_MODEL, max_tokens=4000, syst
     if system:
         params["system"] = system
     resp = client.messages.create(**params)
+    if resp.stop_reason == "refusal" and model != FALLBACK_MODEL and model != SCORE_MODEL:
+        logging.warning(f"{model} declined; retrying on {FALLBACK_MODEL}")
+        return ask_json(client, prompt, schema, model=FALLBACK_MODEL, max_tokens=max_tokens,
+                        system=system, temperature=temperature)
     if resp.stop_reason in ("refusal", "max_tokens"):
         raise ClaudeJSONError(f"stop_reason={resp.stop_reason}")
     usage = getattr(resp, "usage", None)

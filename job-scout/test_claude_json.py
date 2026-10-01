@@ -55,3 +55,24 @@ def test_kb_text_is_stable():
     kb = {"b": 1, "a": {"y": 2, "x": "é"}}
     assert cj.kb_system_text(kb) == cj.kb_system_text(dict(reversed(list(kb.items()))))
     assert "é" in cj.kb_system_text(kb)
+
+
+def test_refusal_retries_once_on_fallback_model():
+    calls = []
+
+    class Client:
+        def __init__(self):
+            self.messages = self
+
+        def create(self, **kw):
+            calls.append(kw["model"])
+            stop = "refusal" if kw["model"] == "claude-sonnet-5-5" else "end_turn"
+
+            class R:
+                stop_reason = stop
+                content = [type("B", (), {"type": "text", "text": '{"ok": true}'})()]
+                usage = None
+            return R()
+
+    assert cj.ask_json(Client(), "hi", cj.obj({"ok": cj.BOOL}), model="claude-sonnet-5-5", temperature=0.3) == {"ok": True}
+    assert calls == ["claude-sonnet-5-5", cj.FALLBACK_MODEL]

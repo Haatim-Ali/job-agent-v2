@@ -349,10 +349,10 @@ def test_answer_schema_pins_keys_and_options():
     schema = ap.answer_schema(QUESTIONS)
     props = schema["properties"]["answers"]["properties"]
     assert "resume" not in props                                        # files aren't answered
-    assert props["auth"]["anyOf"][0] == {"type": "string", "enum": ["Yes", "No"]}
-    assert props["langs"]["anyOf"][0]["items"]["enum"] == ["English", "Spanish"]
-    assert props["school"]["anyOf"][0] == {"type": "string"}            # 100 options: free text
-    assert {"type": "null"} in props["gpa"]["anyOf"]
+    assert props["auth"] == {"type": "string", "enum": ["Yes", "No", ""]}   # "" = no answer
+    assert props["langs"]["items"]["enum"] == ["English", "Spanish"]
+    assert props["school"] == {"type": "string"}                         # 100 options: free text
+    assert "anyOf" not in str(schema)                                    # API limits union types
     assert schema["properties"]["unknown"]["items"]["enum"] == list(props)
 
 
@@ -366,8 +366,8 @@ def test_draft_answers_sends_schema_and_cached_kb(tmp_path, monkeypatch):
             class R:
                 stop_reason = "end_turn"
                 content = [type("B", (), {"type": "text", "text": json.dumps({
-                    "answers": {"first_name": "Haatim", "auth": "Yes", "langs": None, "gpa": None,
-                                "nickname": None, "school": "UC Santa Cruz",
+                    "answers": {"first_name": "Haatim", "auth": "Yes", "langs": [], "gpa": "",
+                                "nickname": "", "school": "UC Santa Cruz",
                                 "q_essay": "I built Pathwise -- an agent — in 24 hours, shipped end to end."},
                     "unknown": ["gpa"]})})()]
             return R()

@@ -516,40 +516,41 @@ RULES:
 - Voluntary self-identification (gender, race, ethnicity, veteran, disability, pronouns,
   sexual orientation): use self_identification from the standard answers, picking the
   closest listed option. Anything it doesn't cover (or says to decline): pick the
-  decline / prefer-not-to-say option; if there is none, null.
+  decline / prefer-not-to-say option; if there is none, "".
 - Free-text questions (why this company, projects, etc.): follow essay_style from the
   standard answers. Reference something specific from the job description.
   Never claim personal experiences, opinions or habits that are not in the knowledge base
   (e.g. "I use your product every day", "I've followed your company for years").
   Motivation must come from the job description plus the candidate's real work.
 - No em dashes, en dashes, or double hyphens ("--") anywhere. Use commas or periods.
-- Optional questions you have no real answer for (e.g. preferred name): null.
+- Optional questions you have no real answer for (e.g. preferred name): "".
 - If a question asks for a fact that is NOT in the standard answers or the knowledge base
-  (e.g. GPA, age, a specific certification), answer null and list its key in "unknown".
+  (e.g. GPA, age, a specific certification), answer "" and list its key in "unknown".
   Do not guess.
 
-Put every question's answer under its key in "answers" (null where you have no real
-answer), and list the keys of questions you couldn't answer from the facts in "unknown"."""
+Put every question's answer under its key in "answers" ("" or [] where you have no real
+answer: never invent one), and list the keys of questions you couldn't answer from the facts in "unknown"."""
 
 
 def answer_schema(questions):
     """Structured-output schema with one property per question, so every answer is under a
     real question key and every dropdown answer is one of that question's actual options
-    (long searchable lists like every university are free text instead)."""
+    (long searchable lists like every university are free text instead).
+    "No answer" is "" (or [] for multiselects) rather than null: the API rejects schemas with
+    many nullable/union fields, and validate_answers treats both the same."""
     props = {}
     for q in questions:
         if q["type"] == "file":
             continue
         opts = q["options"] if 0 < len(q["options"]) <= MAX_OPTIONS else []
         if q["type"] == "select" and opts:
-            value = {"type": "string", "enum": opts}
+            props[q["key"]] = {"type": "string", "enum": opts + ([""] if "" not in opts else [])}
         elif q["type"] == "multiselect" and opts:
-            value = {"type": "array", "items": {"type": "string", "enum": opts}}
+            props[q["key"]] = {"type": "array", "items": {"type": "string", "enum": opts}}
         elif q["type"] == "multiselect":
-            value = {"type": "array", "items": {"type": "string"}}
+            props[q["key"]] = {"type": "array", "items": {"type": "string"}}
         else:
-            value = {"type": "string"}
-        props[q["key"]] = {"anyOf": [value, {"type": "null"}]}
+            props[q["key"]] = {"type": "string"}
     return {"type": "object", "additionalProperties": False, "required": ["answers", "unknown"],
             "properties": {
                 "answers": {"type": "object", "properties": props, "required": list(props),
@@ -565,7 +566,7 @@ def draft_answers(job, form, client=None):
     kb = yaml.safe_load(open(KB_PATH))
     standard = yaml.safe_load(open(ANSWERS_PATH))
     result = ask_json(client, build_answer_prompt(job, form, kb, standard), answer_schema(form["questions"]),
-                      model=MODEL, max_tokens=4000, system=cached_system(kb_system_text(kb)))
+                      model=MODEL, max_tokens=16000, system=cached_system(kb_system_text(kb)))
     result["answers"] = {k: strip_dashes(v) for k, v in (result.get("answers") or {}).items()}
     return validate_answers(form["questions"], result.get("answers") or {}, result.get("unknown") or [])
 

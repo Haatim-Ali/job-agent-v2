@@ -362,7 +362,7 @@ Answer with: relevant (true/false), reason (one sentence max), fit_score (1 to 1
 experience_required (e.g. "0-1 years" or "5+ years"), location_ok (true/false)."""
 
     try:
-        result = ask_json(client, prompt, SCORE_SCHEMA, model=SCORE_MODEL, max_tokens=300)
+        result = ask_json(client, prompt, SCORE_SCHEMA, model=SCORE_MODEL, max_tokens=1000)
         result["fit_score"] = max(1, min(10, int(result["fit_score"])))   # schemas can't enforce ranges
         return result
     except Exception as e:
