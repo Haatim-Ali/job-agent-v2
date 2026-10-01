@@ -18,3 +18,8 @@ job-scout/application_answers.yaml
 # Generated application packets and local resume builds
 applications/
 .DS_Store
+# job-scout runtime files
+job-scout/output/
+job-scout/.last_run
+job-scout/.last_api_alert
+job-scout/*.log

@@ -23,6 +23,7 @@ import anthropic
 
 import career_sites
 import apply_prep
+import heartbeat
 
 load_dotenv()
 
@@ -72,6 +73,9 @@ REPOST_SIGNALS = _cfg["repost_signals"]
 
 def init_db():
     conn = sqlite3.connect(DB_PATH)
+    # WAL lets the bot read and write while a scraper run is writing (and vice versa);
+    # the setting is stored in the database file, so this only changes it once
+    conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS seen_jobs (
             job_url TEXT PRIMARY KEY,
@@ -547,6 +551,17 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
 
 
 def run():
+    heartbeat.run_started()
+    try:
+        alerted = _run()
+    except Exception as e:
+        logging.exception("Scraper run crashed")
+        heartbeat.run_finished(0, error=f"crashed: {e}")
+        raise
+    heartbeat.run_finished(alerted, error=f"Claude unavailable: {_claude_unavailable}" if _claude_unavailable else None)
+
+
+def _run():
     logging.info("=== Scraper run started ===")
     conn = init_db()
     apply_prep.db_conn().close()  # make sure the apply_queue table exists
@@ -597,6 +612,7 @@ def run():
     if _claude_unavailable:
         logging.error(f"Claude unavailable this run ({_claude_unavailable}); unscored jobs left for retry")
     logging.info(f"=== Scraper run complete. Jobs alerted: {total_alerted} ===")
+    return total_alerted
 
 
 if __name__ == "__main__":

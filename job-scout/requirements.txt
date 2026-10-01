@@ -1,0 +1,18 @@
+# Pinned to the versions running on the VPS (2026-10-01).
+# Install: python3 -m venv venv && venv/bin/pip install -r requirements.txt
+#          venv/bin/playwright install chromium   (headless browser fallback)
+# System packages: texlive (pdflatex) for resume/cover letter PDFs.
+anthropic==0.120.0
+beautifulsoup4==4.15.0
+discord-webhook==1.4.1
+discord.py==2.7.1
+google-auth==2.59.0
+gspread==6.2.1
+pandas==2.3.3
+playwright==1.62.0
+pypdf==6.14.2
+python-dotenv==1.2.2
+python-jobspy==1.1.82
+PyYAML==6.0.3
+requests==2.34.2
+pytest==9.1.1

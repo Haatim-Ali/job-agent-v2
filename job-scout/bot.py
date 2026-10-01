@@ -16,6 +16,7 @@ import discord
 
 import sheets_sync
 import apply_prep
+import heartbeat
 
 try:
     from pypdf import PdfReader
@@ -246,10 +247,34 @@ def _extract_job_info(message, channel_id):
 
 # ── Discord events ────────────────────────────────────────────────────────────
 
+_watchdog_started = False
+
+
+async def scraper_watchdog():
+    """Every 15 minutes: warn once in #job-alerts if the scraper has stopped finishing runs,
+    and once more when it recovers (see heartbeat.py)."""
+    stale = False
+    while True:
+        try:
+            stale, message = heartbeat.check(stale)
+            if message:
+                channel = client.get_channel(CHANNEL_ID) or await client.fetch_channel(CHANNEL_ID)
+                mention = f"<@{DISCORD_USER_ID}> " if DISCORD_USER_ID else ""
+                await channel.send(mention + message)
+                logging.warning(f"Watchdog: {message}")
+        except Exception as e:
+            logging.error(f"Watchdog check failed: {e}")
+        await asyncio.sleep(15 * 60)
+
+
 @client.event
 async def on_ready():
+    global _watchdog_started
     logging.info(f"Bot online as {client.user}")
     print(f"Job Scout bot online as {client.user}")
+    if not _watchdog_started:   # on_ready fires again after every reconnect
+        _watchdog_started = True
+        asyncio.create_task(scraper_watchdog())
 
 
 @client.event
