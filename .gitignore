@@ -23,3 +23,6 @@ job-scout/output/
 job-scout/.last_run
 job-scout/.last_api_alert
 job-scout/*.log
+# Any env file except the placeholder template (a real token was once committed in .env.save)
+job-scout/.env*
+!job-scout/.env.example
