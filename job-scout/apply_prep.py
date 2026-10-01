@@ -74,6 +74,15 @@ def db_conn():
         )
     """)
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS learned_boards (
+            ats TEXT,
+            board TEXT,
+            source TEXT,
+            date_added TEXT,
+            PRIMARY KEY (ats, board)
+        )
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS tailored_resumes (
             job_url TEXT PRIMARY KEY,
             filename TEXT,
@@ -111,6 +120,30 @@ def set_status(conn, job_url, status, packet_dir=None, note=None):
         (status, packet_dir, note, _now(), job_url),
     )
     conn.commit()
+
+
+LEARNABLE_ATS = ("greenhouse", "lever", "ashby", "smartrecruiters", "workday")
+
+
+def learn_board(conn, job, source):
+    """Remember the job board of an alerted job, so the scraper checks that company directly
+    from now on (see learned_boards). Returns True if it's new."""
+    ats, board = job.get("site"), job.get("board")
+    if ats not in LEARNABLE_ATS or not board:
+        return False
+    cur = conn.execute("INSERT OR IGNORE INTO learned_boards VALUES (?, ?, ?, ?)", (ats, board, source, _now()))
+    conn.commit()
+    return cur.rowcount == 1
+
+
+def with_learned_boards(career_sites_cfg, conn):
+    """The configured career-site lists plus every learned board (config file untouched)."""
+    cfg = {k: (list(v) if isinstance(v, list) else v) for k, v in career_sites_cfg.items()}
+    for ats, board in conn.execute("SELECT ats, board FROM learned_boards"):
+        boards = cfg.setdefault(ats, [])
+        if board not in boards:
+            boards.append(board)
+    return cfg
 
 
 def record_tailored(job_url, filename, message_url=None):

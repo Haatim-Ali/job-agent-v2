@@ -89,7 +89,12 @@
       "machine learning intern",
       "data science intern",
       "product manager intern"
-    ]
+    ],
+    "smartrecruiters": [],
+    "workday": [
+      "nvidia|wd5|NVIDIAExternalCareerSite"
+    ],
+    "simplify": true
   },
   "role_keywords": [
     "software",

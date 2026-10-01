@@ -153,3 +153,58 @@ class TestClaudeUnavailable:
         conn = scraper.init_db()
         scraper.process_jobs([self._job(9)], conn, from_career_site=True)
         assert scraper.is_seen(conn, "https://x/9")
+
+
+class TestNewSources:
+    def test_workday_posted(self):
+        now = datetime(2026, 10, 1, tzinfo=timezone.utc)
+        assert cs._workday_posted("Posted Today", now) == now
+        assert cs._workday_posted("Posted Yesterday", now).day == 30
+        assert cs._workday_posted("Posted 3 Days Ago", now).day == 28
+        assert (now - cs._workday_posted("Posted 30+ Days Ago", now)).days == 30
+        assert cs._workday_posted("", now) is None
+
+    @pytest.mark.parametrize("url, expected", [
+        ("https://job-boards.greenhouse.io/truveta/jobs/5659745004", ("greenhouse", "truveta")),
+        ("https://boards.greenhouse.io/neuralink/jobs/6083322003", ("greenhouse", "neuralink")),
+        ("https://jobs.lever.co/palantir/774cf5c9-bf6a/apply", ("lever", "palantir")),
+        ("https://jobs.ashbyhq.com/dryft/3f1c261d/application", ("ashby", "dryft")),
+        ("https://jobs.smartrecruiters.com/RESPECInc/744000107100902", ("smartrecruiters", "RESPECInc")),
+        ("https://capitalone.wd12.myworkdayjobs.com/Capital_One/job/McLean-VA/Intern_R1",
+         ("workday", "capitalone|wd12|Capital_One")),
+        ("https://nvidia.wd5.myworkdayjobs.com/en-US/NVIDIAExternalCareerSite/job/x",
+         ("workday", "nvidia|wd5|NVIDIAExternalCareerSite")),
+        ("https://careers.tesla.com/job/123", ("other", "")),
+    ])
+    def test_ats_from_url(self, url, expected):
+        assert cs._ats_from_url(url) == expected
+
+    def test_simplify_filters_and_maps(self, monkeypatch):
+        listings = [
+            {"active": True, "is_visible": True, "title": "SWE Intern", "company_name": "Truveta",
+             "url": "https://job-boards.greenhouse.io/truveta/jobs/1", "locations": ["Seattle, WA"],
+             "date_posted": 1790812800, "terms": ["Summer 2027"], "degrees": ["Bachelor's", "Master's"],
+             "category": "Software", "sponsorship": "Other"},
+            {"active": False, "title": "Closed", "url": "x"},
+            {"active": True, "is_visible": True, "title": "PhD Intern", "url": "y", "degrees": ["PhD"]},
+            {"active": True, "is_visible": True, "title": "Tesla Intern", "company_name": "Tesla",
+             "url": "https://careers.tesla.com/job/1", "date_posted": 1790812800},
+        ]
+
+        class Resp:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return listings
+
+        monkeypatch.setattr(cs.requests, "get", lambda *a, **k: Resp())
+        jobs = cs.fetch_simplify()
+        assert [(j["title"], j["site"], j["board"]) for j in jobs] == [
+            ("SWE Intern", "greenhouse", "truveta"), ("Tesla Intern", "simplify", "")]
+        assert jobs[0]["from_simplify"] and jobs[0]["date_posted"].year == 2026
+        assert "Summer 2027" in jobs[0]["description"]
+
+    def test_parse_dt_epoch_seconds_and_ms(self):
+        assert cs._parse_dt(1790812800).year == 2026
+        assert cs._parse_dt(1790812800000).year == 2026

@@ -1,7 +1,9 @@
 """
 Career-site sources: pull postings straight from company job boards instead of LinkedIn.
 
-Greenhouse, Lever and Ashby expose public JSON job boards; Amazon has its own search JSON.
+Greenhouse, Lever, Ashby and SmartRecruiters expose public JSON job boards; Workday career
+sites call a hidden JSON API; Amazon has its own search JSON; SimplifyJobs publishes the
+community-curated Summer 2027 internship list as one JSON file.
 Each fetcher returns job dicts shaped like a JobSpy row so scraper.process_jobs() can use them.
 """
 
@@ -30,8 +32,8 @@ def _parse_dt(value):
     if value is None or value == "":
         return None
     try:
-        if isinstance(value, (int, float)):  # Lever: epoch ms
-            return datetime.fromtimestamp(value / 1000, tz=timezone.utc)
+        if isinstance(value, (int, float)):  # Lever: epoch ms; SimplifyJobs: epoch seconds
+            return datetime.fromtimestamp(value / 1000 if value > 1e11 else value, tz=timezone.utc)
         dt = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
         return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except ValueError:
@@ -130,6 +132,137 @@ def fetch_amazon(query):
     return jobs
 
 
+def fetch_smartrecruiters(company):
+    """Public SmartRecruiters Posting API. company: the id in jobs.smartrecruiters.com/<id>/..."""
+    base = f"https://api.smartrecruiters.com/v1/companies/{company}/postings"
+    resp = requests.get(base, params={"q": "intern", "limit": 100}, headers=HEADERS, timeout=TIMEOUT)
+    resp.raise_for_status()
+    jobs = []
+    for j in resp.json().get("content", []):
+        loc = j.get("location") or {}
+        location = ", ".join(filter(None, [loc.get("city"), loc.get("region"), loc.get("country", "").upper()]))
+        if loc.get("remote"):
+            location = f"{location} (Remote)".strip()
+        jobs.append(_job(
+            j.get("name", ""), (j.get("company") or {}).get("name") or company, location,
+            f"https://jobs.smartrecruiters.com/{company}/{j.get('id')}", "",
+            _parse_dt(j.get("releasedDate")), "smartrecruiters", company,
+        ))
+    return jobs
+
+
+def smartrecruiters_description(company, posting_id):
+    resp = requests.get(f"https://api.smartrecruiters.com/v1/companies/{company}/postings/{posting_id}",
+                        headers=HEADERS, timeout=TIMEOUT)
+    resp.raise_for_status()
+    sections = (resp.json().get("jobAd") or {}).get("sections") or {}
+    return "\n\n".join(_html_to_text((sections.get(k) or {}).get("text"))
+                        for k in ("companyDescription", "jobDescription", "qualifications", "additionalInformation"))
+
+
+# Workday: "<tenant>|<wd host>|<site>", from a careers URL like
+# https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite -> "nvidia|wd5|NVIDIAExternalCareerSite"
+_WORKDAY_AGE = re.compile(r"(\d+)\+? Days? Ago", re.I)
+
+
+def _workday_posted(text, now=None):
+    """'Posted Today' / 'Posted Yesterday' / 'Posted 3 Days Ago' / 'Posted 30+ Days Ago' -> datetime."""
+    now = now or datetime.now(timezone.utc)
+    text = str(text or "")
+    if "today" in text.lower():
+        return now
+    if "yesterday" in text.lower():
+        return now - timedelta(days=1)
+    m = _WORKDAY_AGE.search(text)
+    return now - timedelta(days=int(m.group(1))) if m else None
+
+
+def fetch_workday(spec, pages=5, max_age_hours=72):
+    """Workday's career-site JSON API (no key needed). Descriptions need a second request per
+    job, so they're fetched only for fresh postings whose title matches the role filter
+    (titles are filtered again in fetch_all)."""
+    tenant, wd, site = spec.split("|")
+    base = f"https://{tenant}.{wd}.myworkdayjobs.com/wday/cxs/{tenant}/{site}"
+    headers = {**HEADERS, "Content-Type": "application/json", "Accept": "application/json"}
+    jobs, cutoff = [], datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    for page in range(pages):
+        resp = requests.post(f"{base}/jobs", json={"appliedFacets": {}, "limit": 20, "offset": page * 20,
+                                                    "searchText": "intern"}, headers=headers, timeout=TIMEOUT)
+        resp.raise_for_status()
+        postings = resp.json().get("jobPostings", [])
+        for j in postings:
+            posted = _workday_posted(j.get("postedOn"))
+            if posted is None or posted < cutoff or not re.search(r"\bintern", j.get("title", ""), re.I):
+                continue
+            desc = ""
+            try:
+                info = requests.get(base + j["externalPath"], headers=headers, timeout=TIMEOUT).json()
+                desc = _html_to_text((info.get("jobPostingInfo") or {}).get("jobDescription"))
+            except (requests.RequestException, ValueError, KeyError):
+                pass
+            jobs.append(_job(
+                j.get("title", ""), tenant.title(), j.get("locationsText", ""),
+                f"https://{tenant}.{wd}.myworkdayjobs.com/{site}{j.get('externalPath', '')}", desc,
+                posted, "workday", spec,
+            ))
+        if len(postings) < 20:
+            break
+    return jobs
+
+
+SIMPLIFY_URL = "https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/.github/scripts/listings.json"
+GRAD_ONLY = {"Master's", "PhD", "MBA"}
+
+
+def _ats_from_url(url):
+    """(site, board) for a posting URL on a board this project understands, else ("other", "")."""
+    m = re.search(r"greenhouse\.io/(?:embed/job_app\?for=)?([\w-]+)/jobs/\d+", url)
+    if m:
+        return "greenhouse", m.group(1)
+    m = re.search(r"jobs\.lever\.co/([\w.-]+)/", url)
+    if m:
+        return "lever", m.group(1)
+    m = re.search(r"jobs\.ashbyhq\.com/([\w.-]+)/", url)
+    if m:
+        return "ashby", m.group(1)
+    m = re.search(r"jobs\.smartrecruiters\.com/([\w-]+)/", url)
+    if m:
+        return "smartrecruiters", m.group(1)
+    m = re.search(r"https://([\w-]+)\.(wd\d+)\.myworkdayjobs\.com/(?:[a-z]{2}-[A-Z]{2}/)?([\w-]+)/", url)
+    if m:
+        return "workday", "|".join(m.groups())
+    return "other", ""
+
+
+def fetch_simplify(url=SIMPLIFY_URL):
+    """SimplifyJobs' Summer 2027 internship list: community submissions plus Simplify's hourly
+    scrape of company career pages. Only open, visible listings that accept undergraduates.
+    The list has no descriptions; Claude scores on title, company, location and the
+    listing's metadata, and packets read the full description from the ATS later."""
+    resp = requests.get(url, headers=HEADERS, timeout=60)
+    resp.raise_for_status()
+    jobs = []
+    for j in resp.json():
+        if not j.get("active") or not j.get("is_visible", True):
+            continue
+        degrees = set(j.get("degrees") or [])
+        if degrees and degrees <= GRAD_ONLY:
+            continue
+        site, board = _ats_from_url(j.get("url", ""))
+        meta = [f"Terms: {', '.join(j.get('terms') or [])}", f"Category: {j.get('category', '')}",
+                f"Degrees: {', '.join(sorted(degrees)) or 'not listed'}",
+                f"Sponsorship: {j.get('sponsorship', 'not listed')}",
+                "(Listing from the SimplifyJobs Summer 2027 internship list; no full description.)"]
+        job = _job(
+            j.get("title", ""), j.get("company_name", ""), "; ".join(j.get("locations") or []),
+            j.get("url", ""), "\n".join(meta), _parse_dt(j.get("date_posted")),
+            site if site != "other" else "simplify", board,
+        )
+        job["from_simplify"] = True
+        jobs.append(job)
+    return jobs
+
+
 def title_matches(title, role_keywords, intern_keywords, exclude_titles):
     t = f" {str(title).lower()} "
     if any(x in t for x in exclude_titles):
@@ -148,7 +281,10 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles):
         [(fetch_greenhouse, b) for b in cfg.get("greenhouse", [])]
         + [(fetch_lever, c) for c in cfg.get("lever", [])]
         + [(fetch_ashby, b) for b in cfg.get("ashby", [])]
+        + [(fetch_smartrecruiters, c) for c in cfg.get("smartrecruiters", [])]
+        + [(fetch_workday, w) for w in cfg.get("workday", [])]
         + [(fetch_amazon, q) for q in cfg.get("amazon_queries", [])]
+        + ([(lambda _: fetch_simplify(), "simplify")] if cfg.get("simplify", True) else [])
     )
 
     results, seen_urls = [], set()
@@ -156,7 +292,7 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles):
         try:
             jobs = fetch(arg)
         except Exception as e:
-            logging.warning(f"Career site {fetch.__name__}({arg}) failed: {e}")
+            logging.warning(f"Career site {getattr(fetch, '__name__', 'source')}({arg}) failed: {e}")
             continue
         kept = 0
         for job in jobs:
@@ -170,5 +306,5 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles):
             seen_urls.add(job["job_url"])
             results.append(job)
             kept += 1
-        logging.info(f"Career site {fetch.__name__}({arg}): {len(jobs)} postings, {kept} new-ish matches")
+        logging.info(f"Career site {getattr(fetch, '__name__', 'source')}({arg}): {len(jobs)} postings, {kept} new-ish matches")
     return results

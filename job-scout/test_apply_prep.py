@@ -329,3 +329,16 @@ def test_greenhouse_form_includes_demographic_survey(monkeypatch):
     form = ap.greenhouse_form("waymo", "8238525")
     gender = next(q for q in form["questions"] if q["key"] == "75902")
     assert gender["type"] == "select" and gender["options"] == ["Male", "Female"] and gender["required"]
+
+
+def test_learned_boards_merge_into_config(tmp_path, monkeypatch):
+    monkeypatch.setattr(ap, "DB_PATH", str(tmp_path / "jobs.db"))
+    conn = ap.db_conn()
+    assert ap.learn_board(conn, {"site": "ashby", "board": "claylabs"}, "linkedin lookup")
+    assert not ap.learn_board(conn, {"site": "ashby", "board": "claylabs"}, "simplify")   # already known
+    assert not ap.learn_board(conn, {"site": "simplify", "board": ""}, "simplify")       # nothing to learn
+    ap.learn_board(conn, {"site": "greenhouse", "board": "figma"}, "simplify")
+    cfg = {"max_age_hours": 72, "greenhouse": ["figma", "stripe"], "ashby": ["openai"]}
+    merged = ap.with_learned_boards(cfg, conn)
+    assert merged["ashby"] == ["openai", "claylabs"] and merged["greenhouse"] == ["figma", "stripe"]
+    assert cfg["ashby"] == ["openai"]   # config itself untouched

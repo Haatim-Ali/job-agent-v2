@@ -427,7 +427,9 @@ def send_discord_alert(job, analysis, is_repost=False):
         flags.append(f"🔥 FRESH -- posted {age_hours:.0f}h ago")
     if is_watchlist:
         flags.append("⭐ WATCHLIST COMPANY")
-    if job.get("site") in ("greenhouse", "lever", "ashby", "amazon"):
+    if job.get("from_simplify"):
+        flags.append("📋 FROM SIMPLIFY INTERNSHIP LIST")
+    elif job.get("site") in ("greenhouse", "lever", "ashby", "amazon", "smartrecruiters", "workday"):
         flags.append("🏢 FROM COMPANY CAREER SITE")
     if applicants is not None:
         try:
@@ -533,6 +535,8 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
         if from_career_site:
             if apply_prep.enqueue(conn, job_dict, analysis.get("fit_score")):
                 logging.info(f"Queued for application packet: {job_dict.get('title')} @ {job_dict.get('company')}")
+            if apply_prep.learn_board(conn, job_dict, "simplify" if job_dict.get("from_simplify") else "career site"):
+                logging.info(f"Learned job board {job_dict.get('site')}/{job_dict.get('board')}")
         else:
             # LinkedIn hides the application link; look for the same role on the company's own board
             try:
@@ -541,6 +545,8 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
                 if ats_job and apply_prep.enqueue(conn, ats_job, analysis.get("fit_score")):
                     logging.info(f"Queued for application packet via {ats_job['site']}: "
                                  f"{job_dict.get('title')} @ {job_dict.get('company')} -> {ats_job['job_url']}")
+                if ats_job and apply_prep.learn_board(conn, ats_job, "linkedin lookup"):
+                    logging.info(f"Learned job board {ats_job['site']}/{ats_job['board']}")
             except Exception as e:
                 logging.warning(f"ATS lookup failed for {job_dict.get('company')}: {e}")
         mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
@@ -569,7 +575,8 @@ def _run():
 
     # Company career sites first -- they often list roles before LinkedIn does
     try:
-        postings = career_sites.fetch_all(CAREER_SITES, ROLE_KEYWORDS, INTERN_KEYWORDS, CAREER_SITE_EXCLUDE_TITLES)
+        sites = apply_prep.with_learned_boards(CAREER_SITES, conn)
+        postings = career_sites.fetch_all(sites, ROLE_KEYWORDS, INTERN_KEYWORDS, CAREER_SITE_EXCLUDE_TITLES)
         total_alerted += process_jobs(postings, conn, from_career_site=True)
     except Exception as e:
         logging.error(f"Career sites step failed: {e}")
