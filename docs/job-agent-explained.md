@@ -786,7 +786,7 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 - **Continuous integration (CI):** `.github/workflows/job-scout-tests.yml` runs the same tests on GitHub's servers for every push to `vps` that touches `job-scout/`. A red ❌ on the commit in GitHub means something broke. Free private-repo minutes cover this easily (one run is about 5 minutes, mostly installing packages).
 - **Dependencies:** `job-scout/requirements.txt` pins the exact versions running on the VPS, so the environment can be rebuilt identically and CI tests what production runs.
 - **Rolling back** by hand: `git reset --hard <previous commit>` on the VPS, or revert the commit on the Mac and deploy again.
-- **Before 2026-10-01** code was copied with `scp` into dated backup folders (`~/job-scout-backup-*`, `~/job-agent-old-2026-10-01`); those are kept as history.
+- **Before 2026-10-01** code was copied with `scp` into dated backup folders. Those were deleted on 2026-10-01 once everything was in git; the two files that existed only there are in `archive/vps-old-2026-10-01/`.
 - **Secrets stay out of git.** `.env*` files (except `.env.example`) and `application_answers.yaml` are ignored. A snapshot commit on 2026-09-28 had included `.env.save` with the live Discord bot token; it was untracked on 2026-10-01 (it only ever reached the private repo).
 
 ## Troubleshooting runbook
