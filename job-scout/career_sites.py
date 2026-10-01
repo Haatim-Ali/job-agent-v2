@@ -42,7 +42,7 @@ def _parse_dt(value):
         return None
 
 
-def _job(title, company, location, url, description, posted, site):
+def _job(title, company, location, url, description, posted, site, board=""):
     return {
         "title": title,
         "company": company,
@@ -52,6 +52,7 @@ def _job(title, company, location, url, description, posted, site):
         "date_posted": posted,
         "applicants": None,
         "site": site,
+        "board": board,  # ATS board/company slug, used by apply_prep to find the application form
     }
 
 
@@ -67,7 +68,7 @@ def fetch_greenhouse(board):
         jobs.append(_job(
             j.get("title", ""), company, (j.get("location") or {}).get("name", ""),
             j.get("absolute_url", ""), _html_to_text(j.get("content")),
-            _parse_dt(j.get("first_published") or j.get("updated_at")), "greenhouse",
+            _parse_dt(j.get("first_published") or j.get("updated_at")), "greenhouse", board,
         ))
     return jobs
 
@@ -83,7 +84,7 @@ def fetch_lever(company):
         desc = "\n".join(filter(None, [j.get("descriptionPlain"), j.get("additionalPlain")]))
         jobs.append(_job(
             j.get("text", ""), company.title(), (j.get("categories") or {}).get("location", ""),
-            j.get("hostedUrl", ""), desc, _parse_dt(j.get("createdAt")), "lever",
+            j.get("hostedUrl", ""), desc, _parse_dt(j.get("createdAt")), "lever", company,
         ))
     return jobs
 
@@ -102,7 +103,7 @@ def fetch_ashby(board):
         jobs.append(_job(
             j.get("title", ""), board.title(), location, j.get("jobUrl", ""),
             j.get("descriptionPlain") or _html_to_text(j.get("descriptionHtml")),
-            _parse_dt(j.get("publishedAt")), "ashby",
+            _parse_dt(j.get("publishedAt")), "ashby", board,
         ))
     return jobs
 

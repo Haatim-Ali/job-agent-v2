@@ -1,0 +1,43 @@
+# ─────────────────────────────────────────────────────────────
+# Standard application answers (EXAMPLE: copy to application_answers.yaml and fill in) — used by apply_prep.py when drafting
+# answers to application form questions. Edit freely.
+#
+# Anything not covered here or in experience_kb.yaml is left blank and
+# flagged in the packet, so it gets answered by hand at submit time.
+# Add the answer here afterwards and it will be reused from then on.
+# ─────────────────────────────────────────────────────────────
+
+# Contact details for application forms. These override experience_kb.yaml.
+email: "you@school.edu"
+legal_name_on_government_id: "First Middle Last"
+
+permanent_address: "123 Main St, City, ST 00000"
+citizenship: "US Citizen | Lawful Permanent Resident | ..."
+export_license_required: "No"
+work_authorization: "Authorized to work anywhere in the United States"
+requires_sponsorship: "No, now or in the future"
+start_date: "Any time after December 30, 2026"
+how_did_you_hear: "Company website (pick the closest option; LinkedIn or Handshake are also fine)"
+graduation: "Expected March 2028 (Spring 2028 / Winter quarter 2028 if asked by term)"
+current_school: "University of California, Santa Cruz"
+degree: "B.S. Computer Science (undergraduate)"
+current_location: "San Jose, CA, United States"
+willing_to_relocate: "Yes. Answer Yes to any relocation or on-site / in-office location question, wherever the role is."
+previously_employed_by_company: "No, unless experience_kb.yaml lists that company"
+
+# Voluntary self-identification (EEO / demographics). Anything not listed here: decline.
+self_identification:
+  gender: "Decline to self-identify"
+  race: "Decline to self-identify"
+  hispanic_or_latino: "Decline to self-identify"
+  veteran_status: "Decline to self-identify"
+  disability_status: "Decline to self-identify"
+  sexual_orientation: "Decline to self-identify"
+  pronouns: "Decline to self-identify"
+  transgender: "Decline to self-identify"
+
+# Free-text answers (why this company, why this role, etc.)
+essay_style: >
+  Direct and specific, 60-150 words unless the question asks otherwise.
+  Only real facts from experience_kb.yaml. Tie one concrete project or
+  result to something specific from the job description. No em dashes.

@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 import discord
 
 import sheets_sync
+import apply_prep
 
 try:
     from pypdf import PdfReader
@@ -324,9 +325,12 @@ async def on_raw_reaction_add(payload):
         if not job_url:
             return
         log_application(job_url, title.strip(), company.strip())
+        resume = apply_prep.resume_used(job_url)
         sheet_result = await asyncio.get_running_loop().run_in_executor(
-            None, sheets_sync.record_safe, company.strip(), title.strip(), job_url, "applied",
-            f"logged from Discord {datetime.now().strftime('%-m/%-d/%Y')}",
+            None, lambda: sheets_sync.record_safe(
+                company.strip(), title.strip(), job_url, "applied",
+                f"logged from Discord {datetime.now().strftime('%-m/%-d/%Y')}", resume=resume,
+            ),
         )
         await channel.send(
             f"<@{payload.user_id}> ✅ Logged application!\n"

@@ -330,6 +330,17 @@ def fetch_job_description_browser(url):
         return None
 
 
+def output_filename(company, kind):
+    """User-facing file name, e.g. Haatim_Ali_Figma_Resume.pdf / Haatim_Ali_Figma_Cover_Letter.pdf."""
+    try:
+        name = load_kb().get("personal", {}).get("name", "")
+    except (OSError, AttributeError):
+        name = ""
+    parts = [re.sub(r"[^A-Za-z0-9]+", "_", p).strip("_") for p in (name, company or "Company")]
+    suffix = "Resume" if kind == "resume" else "Cover_Letter"
+    return "_".join(p for p in parts + [suffix] if p) + ".pdf"
+
+
 def load_kb():
     with open(KB_PATH, "r") as f:
         return yaml.safe_load(f)
@@ -495,18 +506,22 @@ async def send_to_discord(channel_id, job_url, resume_pdf, cover_pdf, analysis):
 
             files = []
             if resume_pdf and os.path.exists(resume_pdf):
-                files.append(discord.File(resume_pdf, filename=f"Resume_{company}.pdf"))
+                files.append(discord.File(resume_pdf, filename=output_filename(company, "resume")))
             if cover_pdf and os.path.exists(cover_pdf):
-                files.append(discord.File(cover_pdf, filename=f"CoverLetter_{company}.pdf"))
+                files.append(discord.File(cover_pdf, filename=output_filename(company, "cover_letter")))
 
             error = analysis.get("error")
             if error:
                 await channel.send(f"Tailor failed: {error}")
             else:
-                await channel.send(
+                msg = await channel.send(
                     content=f"**{role} @ {company}**\n{job_url}",
                     files=files or discord.utils.MISSING
                 )
+                if job_url and resume_pdf and os.path.exists(resume_pdf):
+                    # So ✅ on this job can put the exact resume in the tracker's Resume Used column
+                    import apply_prep
+                    apply_prep.record_tailored(job_url, output_filename(company, "resume"), msg.jump_url)
 
                 if not files:
                     await channel.send(
@@ -557,10 +572,11 @@ def main():
         # CLI mode: copy to RESUME_SYNC_PATH if configured, else leave in OUTPUT_DIR
         dest = RESUME_SYNC_PATH if RESUME_SYNC_PATH and os.path.isdir(RESUME_SYNC_PATH) else OUTPUT_DIR
         slug = analysis.get("company_slug", "company")
+        company = analysis.get("company", slug)
 
-        for src, name in [
-            (resume_pdf, f"Resume_{slug}.pdf"),
-            (cover_pdf,  f"CoverLetter_{slug}.pdf"),
+        for src, name, tex_name in [
+            (resume_pdf, output_filename(company, "resume"), f"Resume_{slug}.tex"),
+            (cover_pdf,  output_filename(company, "cover_letter"), f"CoverLetter_{slug}.tex"),
         ]:
             if src and os.path.exists(src):
                 final = os.path.join(dest, name)
@@ -568,7 +584,7 @@ def main():
                     shutil.copy(src, final)
                 print(f"Saved: {final}")
             else:
-                tex = os.path.join(OUTPUT_DIR, name.replace('.pdf', '.tex'))
+                tex = os.path.join(OUTPUT_DIR, tex_name)
                 if os.path.exists(tex):
                     print(f"PDF unavailable -- LaTeX saved: {tex}")
 

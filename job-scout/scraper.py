@@ -9,6 +9,8 @@ import sqlite3
 import json
 import logging
 import re
+import subprocess
+import sys
 import time
 import requests
 import yaml
@@ -20,6 +22,7 @@ from discord_webhook import DiscordWebhook, DiscordEmbed
 import anthropic
 
 import career_sites
+import apply_prep
 
 load_dotenv()
 
@@ -523,6 +526,19 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
             continue
 
         send_discord_alert(job_dict, analysis, is_repost=repost)
+        if from_career_site:
+            if apply_prep.enqueue(conn, job_dict, analysis.get("fit_score")):
+                logging.info(f"Queued for application packet: {job_dict.get('title')} @ {job_dict.get('company')}")
+        else:
+            # LinkedIn hides the application link; look for the same role on the company's own board
+            try:
+                ats_job = apply_prep.find_on_ats(job_dict.get("company"), job_dict.get("title"),
+                                                 job_dict.get("description"), job_dict.get("location"))
+                if ats_job and apply_prep.enqueue(conn, ats_job, analysis.get("fit_score")):
+                    logging.info(f"Queued for application packet via {ats_job['site']}: "
+                                 f"{job_dict.get('title')} @ {job_dict.get('company')} -> {ats_job['job_url']}")
+            except Exception as e:
+                logging.warning(f"ATS lookup failed for {job_dict.get('company')}: {e}")
         mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
         alerted += 1
         logging.info(f"Alerted: {job_dict.get('title')} @ {job_dict.get('company')} (score {analysis.get('fit_score')})")
@@ -533,6 +549,7 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
 def run():
     logging.info("=== Scraper run started ===")
     conn = init_db()
+    apply_prep.db_conn().close()  # make sure the apply_queue table exists
     total_alerted = 0
 
     # Company career sites first -- they often list roles before LinkedIn does
@@ -564,6 +581,19 @@ def run():
             time.sleep(2)
 
     conn.close()
+
+    # Build application packets for a few queued jobs (separate process: tailoring is slow
+    # and configures its own logging)
+    if not _claude_unavailable:
+        try:
+            subprocess.run(
+                [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "apply_prep.py"),
+                 "--pending", os.getenv("APPLY_PREP_PER_RUN", "3")],
+                timeout=1200,
+            )
+        except Exception as e:
+            logging.error(f"Application packet step failed: {e}")
+
     if _claude_unavailable:
         logging.error(f"Claude unavailable this run ({_claude_unavailable}); unscored jobs left for retry")
     logging.info(f"=== Scraper run complete. Jobs alerted: {total_alerted} ===")

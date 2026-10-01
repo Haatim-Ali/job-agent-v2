@@ -6,9 +6,9 @@ Optional: does nothing unless both env vars are set
   JOB_TRACKER_SHEET_ID         the spreadsheet ID (from its URL)
 and the sheet is shared with the service account's email as an Editor.
 
-Sheet layout (every tab): A=Company, C=Role, D=Contact, F=Link, G=Status, H=Notes.
+Sheet layout (every tab): A=Company, C=Role, D=Contact, F=Link, G=Status, H=Notes, I=Resume Used.
 A company already listed on some tab gets its row filled in; otherwise a row is appended
-to the first tab. Contact (D) and Resume Used (I) are never touched.
+to the first tab. Contact (D) is never touched; Resume Used (I) only when a resume is given.
 """
 
 import logging
@@ -68,8 +68,17 @@ def find_row(worksheets, company, title, url=""):
     return blank_match or (None, None, False)
 
 
-def record(company, title, url, status, notes="", sheet=None):
-    """Create or update the tracker row. Returns a short description of what changed, or None."""
+def resume_cell(filename, link=None):
+    """Resume Used cell: a clickable file name when there's a link to the file."""
+    if not link:
+        return filename
+    return f'=HYPERLINK("{link}", "{filename.replace(chr(34), "")}")'
+
+
+def record(company, title, url, status, notes="", sheet=None, resume=None):
+    """Create or update the tracker row. Returns a short description of what changed, or None.
+
+    resume: value for Resume Used (see resume_cell); left untouched when None."""
     if sheet is None:
         if not enabled():
             logging.info("Sheets sync skipped: GOOGLE_SERVICE_ACCOUNT_JSON / JOB_TRACKER_SHEET_ID not set")
@@ -81,14 +90,18 @@ def record(company, title, url, status, notes="", sheet=None):
 
     if ws is not None and is_update:
         ws.update_acell(f"G{row}", label)
+        if resume:
+            ws.update(f"I{row}", [[resume]], value_input_option="USER_ENTERED")
         return f"{ws.title} row {row}: status → {label}"
     if ws is not None:
         ws.update(f"C{row}", [[title]])
         ws.update(f"F{row}:H{row}", [[url, label, notes]])
+        if resume:
+            ws.update(f"I{row}", [[resume]], value_input_option="USER_ENTERED")
         return f"{ws.title} row {row}: filled {title} ({label})"
 
     ws = worksheets[0]
-    ws.append_row([company, "", title, "", "", url, label, notes],
+    ws.append_row([company, "", title, "", "", url, label, notes, resume or ""],
                   value_input_option="USER_ENTERED", table_range="A1")
     return f"{ws.title}: added {company} — {title} ({label})"
 

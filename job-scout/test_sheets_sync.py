@@ -31,7 +31,7 @@ class FakeWorksheet:
         col, row = re.match(r"([A-Z])(\d+)", a1).groups()
         self._set(int(row), ord(col) - 64, value)
 
-    def update(self, rng, values):
+    def update(self, rng, values, **kwargs):
         col, row = re.match(r"([A-Z])(\d+)", rng).groups()
         for offset, v in enumerate(values[0]):
             self._set(int(row), ord(col) - 64 + offset, v)
@@ -121,3 +121,22 @@ def test_record_safe_swallows_errors():
         def worksheets(self):
             raise RuntimeError("boom")
     assert ss.record_safe("Adobe", "Intern", "", "applied", sheet=Broken()) is None
+
+
+def test_resume_used_written_on_new_update_and_fill():
+    sheet, product, _ = _sheet()
+    link = ss.resume_cell("Haatim_Ali_Stripe_Resume.pdf", "https://discord.com/channels/1/2/3")
+    assert link == '=HYPERLINK("https://discord.com/channels/1/2/3", "Haatim_Ali_Stripe_Resume.pdf")'
+    ss.record("Stripe", "SWE Intern", "https://x/1", "applied", sheet=sheet, resume=link)
+    assert product.rows[3][8] == link
+    ss.record("Adobe", "Intern", "https://x/2", "applied", sheet=sheet, resume="General/default resume")
+    assert product.rows[2][8] == "General/default resume"
+    ss.record("Celestica", "Intern", "https://x/4", "applied", sheet=sheet, resume="r.pdf")
+    assert product.rows[-1][8] == "r.pdf"
+
+
+def test_resume_used_untouched_without_resume():
+    sheet, product, _ = _sheet()
+    product.rows[3] += ["", "keep me"]
+    ss.record("Stripe", "SWE Intern", "https://x/1", "interview", sheet=sheet)
+    assert product.rows[3][8] == "keep me"
