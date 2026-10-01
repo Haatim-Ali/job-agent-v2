@@ -1,0 +1,26 @@
+name: job-scout tests
+
+on:
+  push:
+    branches: [vps]
+    paths: ["job-scout/**", ".github/workflows/job-scout-tests.yml"]
+  pull_request:
+    paths: ["job-scout/**"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: job-scout
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: job-scout/requirements.txt
+      - run: pip install -r requirements.txt
+      # scraper.py, bot.py and tailor.py log to /var/log on import, as they do on the VPS
+      - run: sudo chmod 777 /var/log
+      - run: python -m pytest -q --ignore=test_discord.py --ignore=test_linkedin.py
