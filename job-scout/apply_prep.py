@@ -733,6 +733,8 @@ def post_discord(text, ping=False, attachment=None):
 
 
 def notify(packet):
+    if os.getenv("REMOTE_FILLER") == "1":
+        return   # the remote filler posts its own message, with the link, once the form is filled
     needs = [q["label"] for q in packet["questions"] if q["needs_you"]]
     drafted = sum(1 for q in packet["questions"] if q["answer"] not in (None, "", []))
     post_discord(
