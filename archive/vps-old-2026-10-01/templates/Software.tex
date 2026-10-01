@@ -1,0 +1,220 @@
+%-------------------------
+% Resume in Latex
+% Author : Jake Gutierrez
+% Based off of: https://github.com/sb2nov/resume
+% License : MIT
+%------------------------
+
+\documentclass[letterpaper,11pt]{article}
+
+\usepackage{latexsym}
+\usepackage[empty]{fullpage}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\input{glyphtounicode}
+
+
+%----------FONT OPTIONS----------
+% sans-serif
+% \usepackage[sfdefault]{FiraSans}
+% \usepackage[sfdefault]{roboto}
+% \usepackage[sfdefault]{noto-sans}
+% \usepackage[default]{sourcesanspro}
+
+% serif
+% \usepackage{CormorantGaramond}
+% \usepackage{charter}
+
+
+\pagestyle{fancy}
+\fancyhf{} % clear all header and footer fields
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.5in}
+\addtolength{\evensidemargin}{-0.5in}
+\addtolength{\textwidth}{1in}
+\addtolength{\topmargin}{-.5in}
+\addtolength{\textheight}{1.0in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{0.97\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & #2 \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \textit{\small#1} & \textit{\small #2} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+    \item
+    \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+      \small#1 & #2 \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.15in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}
+\newcommand{\resumeItemListStart}{\begin{itemize}}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+%-------------------------------------------
+%%%%%%  RESUME STARTS HERE  %%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+\begin{document}
+
+%----------HEADING----------
+% \begin{tabular*}{\textwidth}{l@{\extracolsep{\fill}}r}
+%   \textbf{\href{http://sourabhbajaj.com/}{\Large Sourabh Bajaj}} & Email : \href{mailto:sourabh@sourabhbajaj.com}{sourabh@sourabhbajaj.com}\\
+%   \href{http://sourabhbajaj.com/}{http://www.sourabhbajaj.com} & Mobile : +1-123-456-7890 \\
+% \end{tabular*}
+
+\begin{center}
+    \textbf{\Huge \scshape Haatim Ali}\\ \vspace{1pt}
+    {Fremont, CA} $|$ 
+    \small {(510) 468 7997} $|$ 
+    {haatimta@gmail.com} $|$
+    \href{https://www.linkedin.com/in/haatim-ali/}{{www.linkedin.com/in/haatim-ali/}} $|$
+    \href{https://github.com/Haatim-Ali}{{https://github.com/Haatim-Ali}}
+\end{center}
+
+
+%-----------EDUCATION-----------
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {University of California Santa Cruz}{Santa Cruz, CA}
+      {Bachelor of Science in Computer Science}{Sept. 2025 -- June 2029}
+    \resumeSubheading
+      {Ohlone College}{Fremont, CA}
+      {Relevant Coursework: Introduction to Statistics, Intro to Programming Using C++}{Feb. 2024 -- May 2025}
+  \resumeSubHeadingListEnd
+
+
+%-----------EXPERIENCE-----------
+\section{Work Experience}
+  \resumeSubHeadingListStart
+
+    \resumeSubheading
+      {Website Developer}{June 2022 -- Current}
+      {Golden Harvest Montessori}{Milpitas, CA}
+      \resumeItemListStart
+        \resumeItem{Designing and maintaining a custom website that has driven 150+ parent enrollments over 3 years}
+        \resumeItem{Leading a team of 3 developers using agile methodologies to meet client requirements and deadlines}
+        \resumeItem{Engineer responsive layouts that improved cross-device performance for a 500+ monthly visitor audience}
+        \resumeItem{Conducting thorough testing to maintain functionality, security, and reliability}
+      \resumeItemListEnd
+      
+% -----------Multiple Positions Heading-----------
+%    \resumeSubSubheading
+%     {Software Engineer I}{Oct 2014 - Sep 2016}
+%     \resumeItemListStart
+%        \resumeItem{Apache Beam}
+%          {Apache Beam is a unified model for defining both batch and streaming data-parallel processing pipelines}
+%     \resumeItemListEnd
+%    \resumeSubHeadingListEnd
+%-------------------------------------------
+
+    \resumeSubheading
+      {Python Programming Camp Instructor}{June 20 - Aug. 20 2022 - 2025}
+      {Golden Harvest Montessori}{Milpitas, CA}
+      \resumeItemListStart
+        \resumeItem{Directed a 4-week Python camp for 30+ students ages 6–12, with 100 percent of students completing and presenting a final coding project}
+        \resumeItem{Designed a 20+ lesson curriculum blending technical instruction with creative problem solving, adopted as the school's standard summer CS program}
+        \resumeItem{Supervised and mentored 2 volunteer assistants, delegating lesson support across 6+ hours of daily programming}
+        \resumeItem{Built a hands-on STEM environment driving 100 percent family re-enrollment the following summer}
+    \resumeItemListEnd
+
+    \resumeSubheading
+      {Youth Sports Camp Coach}{June 20 - July 3 2022 - 2025}
+      {Golden Harvest Montessori}{Milpitas, CA}
+      \resumeItemListStart
+        \resumeItem{Directed a 2-week sports camp for 30+ children ages 6–12, promoting teamwork, sportsmanship, and physical development}
+        \resumeItem{Designed 10+ daily activities across soccer, basketball, and track, tailored to varying age and skill levels, while managing 2 volunteer staff}
+        \resumeItem{Maintained a zero-incident safety record and 100 percent camper retention across 4 consecutive summers}
+      \resumeItemListEnd
+
+  \resumeSubHeadingListEnd
+
+
+%-----------PROJECTS-----------
+\section{Leadership and Activities}
+    \resumeSubHeadingListStart
+    \resumeSubheading
+      {Co-Captain}{Jan 2016 - June 2025}
+      {Fremont Youth Soccer Club}{Fremont, CA}
+      \resumeItemListStart
+        \resumeItem{Competed on the elite first team for 6+ years, serving 3+ years as co-captain and leading a roster of 18+ players}
+        \resumeItem{Drove the team from the lowest to a top bracket in the NorCal Premier League in under 2 years, one of the fastest promotions in club history}
+        \resumeItem{Competed in 20+ cities against top-tier opponents, consistently demonstrating advanced technical skill and tactical understanding}
+    \resumeItemListEnd
+    \resumeSubheading
+      {California State Soccer Player}{Oct. 2022 - Oct. 2023}
+      {Olympic Development Program (ODP)}{Ripon, CA}
+      \resumeItemListStart
+        \resumeItem{Selected for the prestigious ODP State Team after multi-round regional tryouts, earning recognition as one of the top 50 players statewide}
+        \resumeItem{Represented California in interstate showcase tournaments against other State Teams, competing in front of collegiate scouts and U.S. national team coaches}
+        \resumeItem{Built leadership, discipline, and resilience through a year-long high-performance cycle balancing elite athletics with full-time academic commitments}
+    \resumeItemListEnd
+      
+
+
+
+%
+%-----------PROGRAMMING SKILLS-----------
+\section{Technical Skills}
+ \begin{itemize}[leftmargin=0.15in, label={}]
+    \small{\item{
+     \textbf{Languages}{: Python, C++, JavaScript, HTML/CSS} \\
+     \textbf{Developer Tools}{: Git, VS Code, CLion, PyCharm, GitHub} \\
+     \textbf{Libraries}{: Pandas, NumPy, Matplotlib}\\
+     \textbf{Frameworks}{: React, Node.js}\\
+     \textbf{Software Tools}{: Fusion 360, Adobe Illustrator, PrusaSlicer, Microsoft Excel, Numbers}
+    }}
+ \end{itemize}
+
+
+%-------------------------------------------
+\end{document}
