@@ -576,6 +576,9 @@ RULES:
   Motivation must come from the job description plus the candidate's real work.
 - No em dashes, en dashes, or double hyphens ("--") anywhere. Use commas or periods.
 - Optional questions you have no real answer for (e.g. preferred name): "".
+- Disclosures and attestations (conflicts of interest, relationships with employees,
+  government officials, background checks, criminal history, non-competes): answer ONLY from
+  the standard answers. If they don't cover it, answer "" and list the key in "unknown".
 - If a question asks for a fact that is NOT in the standard answers or the knowledge base
   (e.g. GPA, age, a specific certification), answer "" and list its key in "unknown".
   Do not guess.
