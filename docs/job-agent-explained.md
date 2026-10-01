@@ -158,13 +158,14 @@ Key packages and the versions installed on the VPS:
 
 ## cron: the scheduler
 
-**cron** is the classic Linux job scheduler. Its configuration (the **crontab**) for user `Haatim` has one line:
+**cron** is the classic Linux job scheduler. Its configuration (the **crontab**) for user `Haatim`:
 
 ```
-*/30 * * * * /home/Haatim/job-agent/job-scout/venv/bin/python /home/Haatim/job-agent/job-scout/scraper.py
+*/30 * * * * flock -n /tmp/jobscraper.lock /home/Haatim/job-agent/job-scout/venv/bin/python /home/Haatim/job-agent/job-scout/scraper.py
+15 3 * * * /home/Haatim/job-agent/job-scout/venv/bin/python /home/Haatim/job-agent/job-scout/backup_db.py >> /var/log/jobscout_backup.log 2>&1
 ```
 
-The five fields are minute, hour, day of month, month, day of week. `*/30` in the minute field means "every minute divisible by 30," so the scraper starts at :00 and :30 every hour. Each run is a brand-new process: it starts, does one full pass, and exits. A run currently takes about 12 minutes (7:30:02 PM to 7:42:03 PM on 2026-09-30), most of it waiting on LinkedIn and Claude.
+The five fields are minute, hour, day of month, month, day of week. `*/30` in the minute field means "every minute divisible by 30," so the scraper starts at :00 and :30 every hour. **`flock -n`** takes a lock on a file before starting; if the previous run still holds it, `-n` ("non-blocking") makes this run skip instead of overlapping. The second line backs up the database every night at 3:15 (see "Backups"). Each run is a brand-new process: it starts, does one full pass, and exits. A run currently takes about 12 minutes (7:30:02 PM to 7:42:03 PM on 2026-09-30), most of it waiting on LinkedIn and Claude.
 
 **Why cron and not a loop?** A process that exits after every run can't leak memory or get stuck forever, and a crash only loses one run. The next one starts fresh 30 minutes later.
 
@@ -207,7 +208,21 @@ Each program writes its own log file with Python's `logging` module (timestamp, 
 | `/var/log/jobscout_tailor.log` | `tailor.py` (also when run by `apply_prep.py`) | Every resume edit, rejection and reason |
 | `job-scout/apply_prep.log` | `apply_prep.py` | Packet builds and failures |
 
-`tail -f /var/log/jobscraper.log` shows a run live. `grep "Alerted:" /var/log/jobscraper.log` lists every alert ever sent.
+`tail -f /var/log/jobscraper.log` shows a run live. `grep "Alerted:" /var/log/jobscraper.log*` lists every alert in the current and rotated logs.
+
+**Log rotation.** Without it, logs grow forever (the scraper log had reached 32 MB). `/etc/logrotate.d/jobscout` tells **logrotate**, Debian's standard tool run daily by a systemd timer, to rotate each log weekly or whenever it passes 20 MB, keeping 8 old copies gzipped (`jobscraper.log.1`, `.2.gz`, ...). It uses `copytruncate` (copy the file, then empty it in place) because the programs keep their log files open, and moving the file would leave them writing to the moved copy.
+
+## Watchdog: knowing when something stops
+
+A cron job that silently stops is the worst kind of failure: no errors, just no alerts. `heartbeat.py` handles it:
+
+- At the end of every run, the scraper writes `.last_run` (finish time, number alerted, any error).
+- The always-on bot checks it every 15 minutes. If no run has finished for **75 minutes** (two missed runs), it posts one ⚠️ warning in #job-alerts mentioning you, and one "✅ running again" when runs resume. Warnings fire once per outage, not every 15 minutes.
+- Optional: set `HEALTHCHECK_URL` in `.env` to a [healthchecks.io](https://healthchecks.io) check (free for personal use). The scraper pings `/start` when a run begins and the base URL (or `/fail`) when it ends, and healthchecks.io emails you if pings stop. This covers what the bot can't: the whole server going down, which takes the bot with it. This technique is called a **dead man's switch**: silence, not an error message, triggers the alert.
+
+## Backups
+
+`backup_db.py` copies `jobs.db` every night with SQLite's **online backup API**, which produces a consistent copy even if the scraper or bot is writing at that moment (copying the file with `cp` mid-write can capture a half-written, corrupt database). Copies are gzipped into `~/backups/` (about 2.5 MB each) and the newest 14 are kept. To restore: `gunzip -c ~/backups/jobs-DATE.db.gz > job-scout/jobs.db` with the bot stopped.
 
 ## Configuration and secrets
 
@@ -651,7 +666,7 @@ If `APPLICATIONS_CHANNEL_ID` isn't set, notices fall back to the #job-alerts web
 - A **PRIMARY KEY** is the column that uniquely identifies a row; here it's almost always `job_url`, so the same job can't be stored twice.
 - `INSERT OR IGNORE` adds a row unless one with that key already exists; `INSERT OR REPLACE` overwrites it.
 - `CREATE TABLE IF NOT EXISTS` makes table creation safe to run every time a program starts, which is how new tables appear without a separate setup step (a lightweight **migration**).
-- **Concurrency.** The scraper, bot and packet builder can all touch `jobs.db`. SQLite lets many readers in at once but locks the file for each write; Python waits up to 5 seconds for a lock before raising "database is locked." Writes here are tiny and rare, so that's plenty.
+- **Concurrency and WAL.** The scraper, bot and packet builder can all touch `jobs.db`. By default SQLite locks the whole file while writing, so a reader waits. The database now uses **WAL (write-ahead logging)** mode: writes go to a side file (`jobs.db-wal`) that is merged in later, so readers never wait for a writer and a writer only waits for another writer. The scraper sets it with `PRAGMA journal_mode=WAL`, and the setting is stored in the database file itself. Python still waits up to 5 seconds for a write lock before raising "database is locked."
 
 ## The tables
 
@@ -766,21 +781,22 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 
 ## Where the code lives and how it's deployed
 
-- **Source of truth:** the VPS copy that's running. Your Mac's `~/job-agent` repository, on git branch `vps`, mirrors it and is where changes are written and tested first. Your Mac's `vps` branch is backed up to the **private** GitHub repository `github.com/Haatim-Ali/job-agent-private` (git remote `private`; push with `git push private vps`). The public repository `Haatim-Ali/job-agent` is a fork of a collaborator's project (`jsho0/job-agent`); GitHub doesn't allow forks to be private, so this work isn't pushed there, and its `master` branch is the original shared project, which the VPS copy has diverged from.
-- **Deploying a change:**
-  1. Run the tests on the Mac.
-  2. Back up the files about to change on the VPS into a dated folder (for example `~/job-scout-backup-2026-09-30-apply/`).
-  3. Copy the new files with `scp`.
-  4. Run the tests again on the VPS.
-  5. If `bot.py` or anything it imports changed, `sudo systemctl restart jobscout-bot`. The scraper needs nothing: cron starts a fresh process with the new code on the next run.
-- **Rolling back** means copying the backed-up files back into place.
-- `deploy.sh` in the repository is from the original project and points at a different server; it isn't used for this deployment.
+- **Source of truth:** the `vps` branch of the private GitHub repo `Haatim-Ali/job-agent-private`. Changes are written and tested on your Mac (`~/job-agent`), pushed there, and pulled by the VPS, whose `~/job-agent` is a git checkout of that branch (since 2026-10-01). The VPS reads the private repo with a **deploy key**: an SSH key that GitHub grants read-only access to that one repository, so a compromised server can't change your code or see your other repos. Your Mac's `vps` branch is backed up to the **private** GitHub repository `github.com/Haatim-Ali/job-agent-private` (git remote `private`; push with `git push private vps`). The public repository `Haatim-Ali/job-agent` is a fork of a collaborator's project (`jsho0/job-agent`); GitHub doesn't allow forks to be private, so this work isn't pushed there, and its `master` branch is the original shared project, which the VPS copy has diverged from.
+- **Deploying a change:** commit on the Mac, then `bash deploy.sh`. It refuses to run with uncommitted changes, pushes to the private repo, then on the VPS: pulls (fast-forward only), runs the full test suite with the VPS's own packages, and **if any test fails, resets back to the previous commit** and stops. If they pass, it restarts the bot. The scraper needs nothing: cron starts a fresh process with the new code on the next run.
+- **Continuous integration (CI):** `.github/workflows/job-scout-tests.yml` runs the same tests on GitHub's servers for every push to `vps` that touches `job-scout/`. A red ❌ on the commit in GitHub means something broke. Free private-repo minutes cover this easily (one run is about 5 minutes, mostly installing packages).
+- **Dependencies:** `job-scout/requirements.txt` pins the exact versions running on the VPS, so the environment can be rebuilt identically and CI tests what production runs.
+- **Rolling back** by hand: `git reset --hard <previous commit>` on the VPS, or revert the commit on the Mac and deploy again.
+- **Before 2026-10-01** code was copied with `scp` into dated backup folders (`~/job-scout-backup-*`, `~/job-agent-old-2026-10-01`); those are kept as history.
+- **Secrets stay out of git.** `.env*` files (except `.env.example`) and `application_answers.yaml` are ignored. A snapshot commit on 2026-09-28 had included `.env.save` with the live Discord bot token; it was untracked on 2026-10-01 (it only ever reached the private repo).
 
 ## Troubleshooting runbook
 
 | Symptom | Where to look | Likely cause |
 |---|---|---|
+| ⚠️ "scraper hasn't finished a run" in Discord | `crontab -l`, `tail /var/log/jobscraper.log`, `ls /tmp/jobscraper.lock` | cron line removed, a run hanging while holding the lock, or the venv broke after an update |
 | No alerts for hours | `tail /var/log/jobscraper.log`; look for "Claude unavailable" | API credits ran out (you'll also get a ⚠️ in Discord), or simply no new matches |
+| `deploy.sh` says tests failed | its output; it has already rolled back | fix on the Mac, commit, deploy again |
+| Database corrupted or deleted | `~/backups/` | restore last night's copy (see "Backups") |
 | Reactions do nothing | `systemctl is-active jobscout-bot`; `journalctl -u jobscout-bot` | Bot crashed and is restarting, or the token changed |
 | 👍 says "Something went wrong" | `/var/log/jobscout_tailor.log` | LaTeX compile error or Claude error |
 | Sheet not updating | `/var/log/jobscout_bot.log`, lines starting "Sheets sync" | Sheet no longer shared with the service account, or the key file moved |
@@ -806,7 +822,6 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 ## Known limitations
 
 - **In-memory conversation state.** A bot restart forgets a pending ❌ reason or #requests conversation.
-- **No overlap lock on cron.** If a run ever took over 30 minutes, two scraper runs would overlap. Runs take about 12 minutes today, but a lock (for example `flock`) would make this impossible.
 - **LinkedIn scraping** can be blocked. LinkedIn alerts get packets only when the company's own Greenhouse, Lever or Ashby board can be found by name; companies on other systems (Workday, iCIMS, their own sites) or with unusual board names stay plain alerts.
 - **Amazon postings** are alerted but get no packets (Amazon isn't a supported form type).
 - **Company-slug file collisions.** Tailored PDFs are compiled as `Resume_<company>.pdf` in `output/`, so two roles at the same company overwrite each other there. Packets and Discord hold their own copies, so nothing is lost, but `output/` only has the latest.
@@ -928,6 +943,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-01: reliability.** Scraper watchdog (`heartbeat.py`: bot warns in Discord after 75 minutes without a finished run; optional healthchecks.io), `flock` so runs can't overlap, nightly consistent database backups (`backup_db.py`, 14 kept), SQLite WAL mode, log rotation (`/etc/logrotate.d/jobscout`; the 32 MB scraper log was rotated), pinned `requirements.txt`, the VPS converted to a git checkout of the private repo (read-only deploy key) with `deploy.sh` (tests on the VPS, automatic rollback), GitHub Actions CI, rewritten `CLAUDE.md` and README, and `.env.save` (live bot token) removed from tracking. 162 tests passing.
 
 **2026-09-30: faster form filling.** New `form_fill.py` and `test_form_fill.py` (10 tests): a packet becomes one browser batch (helpers installed once, exact-option dropdown picks, text fields last, read-back check). The submit skill fills every form before handing off. Found while testing: hidden Chrome windows throttle and drop input, Greenhouse resets name/email during load, and Figma's race question depends on the Hispanic/Latino answer. Also: the packet builder now reads Greenhouse's separate demographic survey, and `application_answers.yaml` holds the application email, the legal name for government-ID fields, the permanent address, citizenship, the export-license answer and "always yes" for relocation. It's kept out of git because it's personal; `application_answers.yaml.example` shows the format.
 

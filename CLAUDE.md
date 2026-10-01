@@ -1,63 +1,54 @@
-# Job Agent — Claude Code Instructions
+# Job Agent: Claude Code instructions
 
-## Stack
-- Next.js 16 (App Router, TypeScript)
-- Supabase (PostgreSQL)
-- Anthropic Claude API
-- Tailwind CSS + shadcn/ui components
-- Deployed on Vercel (auto-deploys on `git push origin master`)
+Haatim's internship-search bot. **Everything that runs is in `job-scout/`** (Python) on a
+Hostinger VPS. The Next.js app (`app/`, `components/`, `lib/`, `supabase/`, `test/`,
+`package.json`) is the original shared project's web dashboard and is **not used** by this
+deployment; don't edit it for job-bot work.
 
-## Dev
+Full explanation of every component: `docs/job-agent-explained.md` (rendered to
+`docs/Job Agent Explained.pdf`). Read the relevant part before changing something.
+
+## Where things live
+
+- **Repo:** branch `vps`, pushed to the **private** repo `Haatim-Ali/job-agent-private`
+  (git remote `private`). `origin` is a public fork (`Haatim-Ali/job-agent`) and `upstream` the
+  collaborator's original (`jsho0/job-agent`): never push job-bot work there, it contains
+  personal data.
+- **VPS:** `ssh Haatim@2.25.82.228`, code in `~/job-agent` (a git checkout of the private repo,
+  remote `origin` = private repo via deploy key), venv at `job-scout/venv`.
+  - Scraper: crontab, every 30 min with `flock -n /tmp/jobscraper.lock`
+  - Bot: systemd service `jobscout-bot` (`sudo systemctl restart jobscout-bot`)
+  - Backups: `backup_db.py` nightly at 3:15 to `~/backups` (14 kept)
+  - Logs: `/var/log/jobscraper.log`, `jobscout_bot.log`, `jobscout_tailor.log`,
+    `job-scout/apply_prep.log`; rotated by `/etc/logrotate.d/jobscout`
+- **Not in git (personal or secret):** `job-scout/.env`, `job-scout/application_answers.yaml`
+  (address, legal name, citizenship, demographics; template in `.example`), `jobs.db`,
+  `output/`, `applications/` (packets copied to the Mac).
+
+## Working on it
 
 ```bash
-export PATH="/c/Program Files/nodejs:$PATH"
-npm run dev    # local dev server at http://localhost:3000
-npm run build  # production build (requires Vercel env vars or .env.local)
+cd job-scout
+../.venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=test_linkedin.py   # on the Mac
+bash ../deploy.sh   # commit first; pushes, pulls on the VPS, runs tests there, rolls back on failure, restarts the bot
 ```
 
-## Testing
-
-```bash
-npm test           # run all tests (vitest)
-npm run test:watch # watch mode
-```
-
-See [TESTING.md](./TESTING.md) for conventions.
-
-### Test expectations
-- 100% test coverage is the goal — tests make vibe coding safe
-- When writing new functions in `lib/`, write a corresponding test in `test/`
-- When fixing a bug, write a regression test
-- When adding error handling, write a test that triggers the error
-- When adding a conditional (if/else), write tests for both paths
-- Never commit code that makes existing tests fail
-- Mock `@anthropic-ai/sdk` and `@supabase/supabase-js` — never make real API calls in tests
-
-## Key Files
-- `app/api/jobs/ingest/route.ts` — webhook for scraper (POST with `x-api-key` header)
-- `app/api/chat/route.ts` — Claude streaming chat
-- `lib/claude.ts` — system prompt builder + `buildSystemPrompt()`
-- `lib/supabase.ts` — DB client + TypeScript types
-- `components/ui/` — shadcn/ui components (Button, Card, Input, Textarea, Badge)
-
-## Memory
-
-Persistent memory for this project lives in `C:\Users\joshs\job-agent-memory\`.
-
-At the start of each session, read:
-- `job-agent.md` — project context and search criteria
-- `rejection-patterns.md` — recent dismissals from Discord (last 20 rows)
-
-Update `job-agent.md` when priorities change, new decisions are made, or active work shifts.
-The bot on the VPS appends to `rejection-patterns.md` automatically when you dismiss a job with a reason.
-
-## Living architecture doc
-
-`docs/job-agent-explained.md` → `docs/Job Agent Explained.pdf` explains how the whole system works.
-Whenever code, config, deployment or architecture changes (or you learn something significant about
-the internals), update the relevant section of the markdown, add a dated Changelog entry, and re-render:
+- CI (`.github/workflows/job-scout-tests.yml`) runs the same tests on every push to `vps`.
+- `test_discord.py` and `test_linkedin.py` are manual scripts that hit real services, not tests.
+- Write a test for every new function and a regression test for every bug fixed.
+- Mock Anthropic, Discord, Google and HTTP calls in tests; never make real API calls.
+- After any change to code, config, deployment or architecture: update
+  `docs/job-agent-explained.md` (the relevant section plus a dated Changelog entry) and re-render:
 
 ```bash
 cd docs && ~/.claude/skills/gstack/make-pdf/dist/pdf generate --quiet --cover --toc --no-confidential \
   --author "Haatim Ali" --title "Job Agent Explained" job-agent-explained.md "Job Agent Explained.pdf"
 ```
+
+## Rules
+
+- Applications are submitted by Haatim, never by Claude: the `/submit-applications` skill
+  (in `~/.claude/skills/`) fills forms in Chrome and stops before Submit.
+- Ask before ticking any agreement or policy acknowledgment on an application.
+- Don't guess facts on applications (address, GPA, dates): leave them flagged for Haatim.
+- Back up files on the VPS before changing anything outside git (crontab, systemd, /etc).
