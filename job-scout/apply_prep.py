@@ -735,6 +735,15 @@ def packet_resume(packet_dir):
     return (os.path.join(packet_dir, name), name) if name else None
 
 
+def ready_packets(conn):
+    """[{job_url, company, title, packet}] for every packet waiting to be submitted, where
+    packet is the folder name under output/packets (what the Mac copies)."""
+    rows = conn.execute("""SELECT job_url, company, title, packet_dir, note FROM apply_queue
+                           WHERE status = 'ready' ORDER BY date_updated""").fetchall()
+    return [{"job_url": u, "company": c, "title": t, "packet": os.path.basename(d or ""), "note": n}
+            for u, c, t, d, n in rows]
+
+
 def mark_submitted(job_url):
     import sheets_sync
     conn = db_conn()
@@ -775,6 +784,9 @@ def main():
     p.add_argument("--list", action="store_true")
     p.add_argument("--submitted", help="mark a job submitted")
     p.add_argument("--skip", help="drop a job from the queue")
+    p.add_argument("--notify", help="post a message to #applications (used by the Mac watcher)")
+    p.add_argument("--ping", action="store_true", help="with --notify: mention the user")
+    p.add_argument("--ready-json", action="store_true", help="ready packets as JSON (for the watcher)")
     args = p.parse_args()
     conn = db_conn()
 
@@ -794,6 +806,10 @@ def main():
     elif args.skip:
         set_status(conn, args.skip, "skipped")
         print("skipped")
+    elif args.notify:
+        print(post_discord(args.notify, ping=args.ping) or "posted")
+    elif args.ready_json:
+        print(json.dumps(ready_packets(conn)))
     conn.close()
 
 

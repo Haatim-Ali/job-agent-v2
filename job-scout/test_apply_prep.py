@@ -380,3 +380,13 @@ def test_draft_answers_sends_schema_and_cached_kb(tmp_path, monkeypatch):
     assert sent["output_config"]["format"]["type"] == "json_schema"
     assert sent["system"][0]["cache_control"] == {"type": "ephemeral"}
     assert "CANDIDATE KNOWLEDGE BASE" in sent["system"][0]["text"]
+
+
+def test_ready_packets_lists_only_ready(tmp_path, monkeypatch):
+    monkeypatch.setattr(ap, "DB_PATH", str(tmp_path / "jobs.db"))
+    conn = ap.db_conn()
+    for n, status in (("a", "ready"), ("b", "queued"), ("c", "submitted")):
+        ap.enqueue(conn, {"job_url": n, "site": "ashby", "title": "Intern", "company": n.upper()})
+        ap.set_status(conn, n, status, packet_dir=f"/x/packets/{n}-intern", note="complete")
+    assert ap.ready_packets(conn) == [{"job_url": "a", "company": "A", "title": "Intern",
+                                       "packet": "a-intern", "note": "complete"}]
