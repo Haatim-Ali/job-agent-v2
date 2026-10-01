@@ -766,7 +766,7 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 
 ## Where the code lives and how it's deployed
 
-- **Source of truth:** the VPS copy that's running. Your Mac's `~/job-agent` repository, on git branch `vps`, mirrors it and is where changes are written and tested first. (The GitHub `master` branch is the original shared project, which the VPS copy has diverged from.)
+- **Source of truth:** the VPS copy that's running. Your Mac's `~/job-agent` repository, on git branch `vps`, mirrors it and is where changes are written and tested first. Your Mac's `vps` branch is backed up to the **private** GitHub repository `github.com/Haatim-Ali/job-agent-private` (git remote `private`; push with `git push private vps`). The public repository `Haatim-Ali/job-agent` is a fork of a collaborator's project (`jsho0/job-agent`); GitHub doesn't allow forks to be private, so this work isn't pushed there, and its `master` branch is the original shared project, which the VPS copy has diverged from.
 - **Deploying a change:**
   1. Run the tests on the Mac.
   2. Back up the files about to change on the VPS into a dated folder (for example `~/job-scout-backup-2026-09-30-apply/`).
