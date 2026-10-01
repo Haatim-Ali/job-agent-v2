@@ -419,3 +419,16 @@ class TestPostingKey:
                                      "site": "ashby"})
         assert not ap.enqueue(conn, {"job_url": "https://job-boards.greenhouse.io/waymo/jobs/8238525",
                                      "site": "greenhouse", "board": "waymo"})
+
+
+def test_ashby_query_error_fails_loudly(monkeypatch):
+    class Resp:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"errors": [{"message": "Cannot query field"}], "data": None}
+
+    monkeypatch.setattr(ap.requests, "post", lambda *a, **k: Resp())
+    with pytest.raises(ValueError):
+        ap.ashby_form("trajectory", "00cd9b1a-5d48-4ecb-8c53-cd27727448c5")

@@ -330,7 +330,7 @@ def lever_form(company, posting_id):
 
 ASHBY_QUERY = """query ApiJobPosting($organizationHostedJobsPageName: String!, $jobPostingId: String!) {
   jobPosting(organizationHostedJobsPageName: $organizationHostedJobsPageName, jobPostingId: $jobPostingId) {
-    id title descriptionPlainText
+    id title
     applicationForm { sections { title fieldEntries { ... on FormFieldEntry { id field isRequired } } } }
   }
 }"""
@@ -350,7 +350,11 @@ def ashby_form(org, posting_id):
         headers=HEADERS, timeout=TIMEOUT,
     )
     resp.raise_for_status()
-    posting = (resp.json().get("data") or {}).get("jobPosting") or {}
+    body = resp.json()
+    posting = (body.get("data") or {}).get("jobPosting")
+    if body.get("errors") or not posting:
+        # Never build a packet from an empty form: a query error once looked like "no questions"
+        raise ValueError(f"Ashby form lookup failed for {org}/{posting_id}: {str(body.get('errors'))[:200]}")
     questions = []
     for section in (posting.get("applicationForm") or {}).get("sections", []):
         for entry in section.get("fieldEntries", []):
@@ -360,12 +364,27 @@ def ashby_form(org, posting_id):
             if qtype == "boolean":
                 qtype, opts = "select", ["Yes", "No"]
             questions.append(_q(f.get("path", ""), f.get("title", ""), qtype, entry.get("isRequired"), opts))
+    if not questions:
+        raise ValueError(f"Ashby form for {org}/{posting_id} has no questions")
     return {
         "title": posting.get("title", ""), "company": org.title(),
         "form_url": f"https://jobs.ashbyhq.com/{org}/{posting_id}/application",
-        "description": posting.get("descriptionPlainText", ""),
+        "description": ashby_description(org, posting_id),
         "questions": questions,
     }
+
+
+def ashby_description(org, posting_id):
+    """The posting's plain-text description, from Ashby's public job-board feed."""
+    try:
+        resp = requests.get(f"https://api.ashbyhq.com/posting-api/job-board/{org}", headers=HEADERS, timeout=TIMEOUT)
+        resp.raise_for_status()
+        for j in resp.json().get("jobs", []):
+            if posting_id in (j.get("id"), *(j.get("jobUrl", "").split("/")[-1:])):
+                return j.get("descriptionPlain") or ""
+    except (requests.RequestException, ValueError):
+        pass
+    return ""
 
 
 def resolve_form(job_url, ats=None, board=""):
