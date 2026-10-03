@@ -171,7 +171,8 @@ window.__f.focusIn = function (key, label) {
 def setup_js():
     """The tested form_fill helpers, installed with no text (text is set last)."""
     js = form_fill._SETUP % "{}"
-    return js.split("__f.text =")[0] + _EXTRA
+    # End on a plain value: Playwright calls the result if a script evaluates to a function
+    return js.split("__f.text =")[0] + _EXTRA + "\ntrue;"
 
 
 # ── The browser service ───────────────────────────────────────────────────────
