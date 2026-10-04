@@ -10,6 +10,7 @@ Requires: pdflatex  (sudo apt-get install texlive-latex-base texlive-fonts-recom
           pypdf     (pip install pypdf)
 """
 
+import io
 import os
 import re
 import sys
@@ -471,6 +472,13 @@ Also list gaps (requirement + talking point).""",
 
 # ── Output helpers ─────────────────────────────────────────────────────────────
 
+def gaps_attachment(company, role, gaps_text):
+    """(filename, bytes) for the interview-prep gaps file, e.g. Haatim_Ali_Figma_Interview_Prep.txt."""
+    name = output_filename(company, "resume").replace("_Resume.pdf", "_Interview_Prep.txt")
+    body = f"{role} @ {company}\n\n{gaps_text}\n"
+    return name, body.encode("utf-8")
+
+
 def format_gaps(gaps):
     if not gaps:
         return ""
@@ -501,6 +509,10 @@ async def send_to_discord(channel_id, job_url, resume_pdf, cover_pdf, analysis):
                 files.append(discord.File(resume_pdf, filename=output_filename(company, "resume")))
             if cover_pdf and os.path.exists(cover_pdf):
                 files.append(discord.File(cover_pdf, filename=output_filename(company, "cover_letter")))
+            # Gaps go in an attached text file, not as chat messages, to keep #job-alerts clean
+            if gaps:
+                name, data = gaps_attachment(company, role, gaps)
+                files.append(discord.File(io.BytesIO(data), filename=name))
 
             error = analysis.get("error")
             if error:
@@ -516,7 +528,7 @@ async def send_to_discord(channel_id, job_url, resume_pdf, cover_pdf, analysis):
                     import apply_prep
                     apply_prep.record_tailored(job_url, output_filename(company, "resume"), msg.jump_url)
 
-                if not files:
+                if not (resume_pdf and os.path.exists(resume_pdf)):
                     await channel.send(
                         "PDF generation failed -- check /var/log/jobscout_tailor.log for details.\n"
                         "If pdflatex isn't installed, run on VPS:\n"
@@ -524,9 +536,6 @@ async def send_to_discord(channel_id, job_url, resume_pdf, cover_pdf, analysis):
                         f".tex files saved to `{OUTPUT_DIR}`"
                     )
 
-            if gaps:
-                for chunk in [gaps[i:i+1800] for i in range(0, len(gaps), 1800)]:
-                    await channel.send(f"```\n{chunk}\n```")
 
         except Exception as e:
             logging.error(f"Discord send error: {e}")

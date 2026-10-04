@@ -140,3 +140,10 @@ def test_changed_pairs_and_drop_rejected():
 
 def test_changed_pairs_ignores_garbage():
     assert rt.changed_pairs(SECTIONS, {"AIEA_BULLETS": [{"id": "nonsense", "text": "x"}, "bad", {"id": "AIEA_BULLETS-9", "text": "y"}]}) == []
+
+
+def test_gaps_go_in_a_text_file_not_chat():
+    tailor = pytest.importorskip("tailor")
+    name, data = tailor.gaps_attachment("Scale AI", "SWE Intern", "GAPS TO PREPARE FOR:\n1. Go")
+    assert name == "Haatim_Ali_Scale_AI_Interview_Prep.txt"
+    assert data.decode().startswith("SWE Intern @ Scale AI") and "1. Go" in data.decode()

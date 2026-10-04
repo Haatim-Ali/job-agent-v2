@@ -452,7 +452,7 @@ Then the job is marked seen. If it came from Greenhouse, Lever or Ashby it's add
 
 ## Tailored files with every alert
 
-Since 2026-10-04, every job alerted in a run gets a tailored resume and cover letter. After scraping finishes (so alerts aren't delayed), `tailor_alerts` runs `tailor.py <job_url> <#job-alerts id>` once per alerted job, up to `max_tailored_per_run` (15). The job description the scraper already has is passed with `--jd-file`; when it's under 400 characters (SimplifyJobs listings have none), `tailor.py` fetches the posting itself. Each takes about a minute and posts "📎 Tailored resume + cover letter: <role> @ <company>" under the alert, with `Haatim_Ali_<Company>_Resume.pdf`, the cover letter and the gaps to prepare for. The bot records the resume for the Sheet's Resume Used column, so ✅ on the alert links it. 👍 still re-tailors on demand, for example with custom instructions in #requests. Settings: `tailor_every_alert` and `max_tailored_per_run` in `scraper_config.json`.
+Since 2026-10-04, every job alerted in a run gets a tailored resume and cover letter. After scraping finishes (so alerts aren't delayed), `tailor_alerts` runs `tailor.py <job_url> <#job-alerts id>` once per alerted job, up to `max_tailored_per_run` (15). The job description the scraper already has is passed with `--jd-file`; when it's under 400 characters (SimplifyJobs listings have none), `tailor.py` fetches the posting itself. Each takes about a minute and posts "📎 Tailored resume + cover letter: <role> @ <company>" under the alert, with `Haatim_Ali_<Company>_Resume.pdf`, the cover letter, and `Haatim_Ali_<Company>_Interview_Prep.txt` (the gaps to prepare for, attached as a file so they don't fill the channel). The bot records the resume for the Sheet's Resume Used column, so ✅ on the alert links it. 👍 still re-tailors on demand, for example with custom instructions in #requests. Settings: `tailor_every_alert` and `max_tailored_per_run` in `scraper_config.json`.
 
 # Part 5: The Discord bot (`bot.py`)
 
@@ -553,7 +553,7 @@ Every decision is logged to `/var/log/jobscout_tailor.log`, for example `{'id': 
 
 ### Sending the result
 
-When run by the bot, `tailor.py` briefly logs in to Discord as a second, temporary client (`send_to_discord`), posts the PDFs with their `Haatim_Ali_<Company>_...` names, posts the gaps as a code block, and exits. It records the message's **jump URL** (a permanent link to that Discord message) in `tailored_resumes`, so a later ✅ can link the exact resume in your Sheet.
+When run by the bot, `tailor.py` briefly logs in to Discord as a second, temporary client (`send_to_discord`), posts the PDFs with their `Haatim_Ali_<Company>_...` names plus the gaps as an attached `..._Interview_Prep.txt` file (since 2026-10-04; they used to be posted as chat text), and exits. It records the message's **jump URL** (a permanent link to that Discord message) in `tailored_resumes`, so a later ✅ can link the exact resume in your Sheet.
 
 ## Application packets (`apply_prep.py`)
 
