@@ -450,6 +450,10 @@ Alerts are sent through a Discord **webhook**: a secret URL that accepts a messa
 
 Then the job is marked seen. If it came from Greenhouse, Lever or Ashby it's added to `apply_queue` (Part 6). If it came from LinkedIn, the scraper first looks for the same role on the company's own board and queues that posting if it finds one.
 
+## Tailored files with every alert
+
+Since 2026-10-04, every job alerted in a run gets a tailored resume and cover letter. After scraping finishes (so alerts aren't delayed), `tailor_alerts` runs `tailor.py <job_url> <#job-alerts id>` once per alerted job, up to `max_tailored_per_run` (15). The job description the scraper already has is passed with `--jd-file`; when it's under 400 characters (SimplifyJobs listings have none), `tailor.py` fetches the posting itself. Each takes about a minute and posts "📎 Tailored resume + cover letter: <role> @ <company>" under the alert, with `Haatim_Ali_<Company>_Resume.pdf`, the cover letter and the gaps to prepare for. The bot records the resume for the Sheet's Resume Used column, so ✅ on the alert links it. 👍 still re-tailors on demand, for example with custom instructions in #requests. Settings: `tailor_every_alert` and `max_tailored_per_run` in `scraper_config.json`.
+
 # Part 5: The Discord bot (`bot.py`)
 
 ## How a Discord bot works
@@ -552,6 +556,8 @@ Every decision is logged to `/var/log/jobscout_tailor.log`, for example `{'id': 
 When run by the bot, `tailor.py` briefly logs in to Discord as a second, temporary client (`send_to_discord`), posts the PDFs with their `Haatim_Ali_<Company>_...` names, posts the gaps as a code block, and exits. It records the message's **jump URL** (a permanent link to that Discord message) in `tailored_resumes`, so a later ✅ can link the exact resume in your Sheet.
 
 ## Application packets (`apply_prep.py`)
+
+> **Status since 2026-10-04: form filling is switched off.** Haatim fills applications with each site's own autofill. Every alert instead gets its tailored resume and cover letter (see "Tailored files with every alert" in Part 4). The packet, form-fill, watcher and remote-filler code described below is kept in the repo but disabled (`"application_packets": false` in `scraper_config.json`), and the remote-browser services were removed from the VPS.
 
 ### The queue
 
@@ -987,6 +993,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 # Changelog
 
 **2026-10-01 (evening): status check and doc audit.** The VPS runs commit `4060f85`, matching the private repo. In the day's 23 scraper runs it alerted **38 jobs**, with a few one-off connection timeouts to Greenhouse/Lever boards that were skipped and retried on the next run (expected "fail soft" behavior). Application queue: **5 submitted** (Figma, Waymo, Muon Space, Pinterest, Robinhood), 3 ready (Trajectory, Quadric AI Kernel Engineer, Rhoda AI), others being prepared or skipped. Doc updates: disclosure-question rule, which contact details go on documents vs forms, and the resume template's one deliberate difference from `Haatim_Ali_Resume.pdf` (Fremont).
+
+**2026-10-04: tailored files with every alert; form filling switched off.** Every alert now gets its tailored resume and cover letter posted under it (`tailor_alerts` in `scraper.py`). Application packets, the Mac fill skill, the watcher and the remote filler are disabled: Haatim uses each site's own autofill. Remote-browser services (Xvfb, x11vnc, noVNC, filler) removed from the VPS; Tailscale stopped. Before the switch, 6 applications were submitted with the fill flow (Figma, Waymo, Muon Space, Pinterest, Robinhood, Trajectory, Quadric AI Kernel).
 
 **2026-10-01: location is Fremont, CA.** Resume and cover letter headers, `experience_kb.yaml`, `application_answers.yaml` and the form filler's city field changed from San Jose to Fremont. Job search locations are unchanged. Robinhood (Data Science Intern) was submitted with San Jose just before the change.
 

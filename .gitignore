@@ -26,3 +26,4 @@ job-scout/*.log
 # Any env file except the placeholder template (a real token was once committed in .env.save)
 job-scout/.env*
 !job-scout/.env.example
+*.log.*

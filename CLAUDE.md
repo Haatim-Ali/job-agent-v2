@@ -47,8 +47,10 @@ cd docs && ~/.claude/skills/gstack/make-pdf/dist/pdf generate --quiet --cover --
 
 ## Rules
 
-- Applications are submitted by Haatim, never by Claude: the `/submit-applications` skill
-  (in `~/.claude/skills/`) fills forms in Chrome and stops before Submit.
+- **No form filling (since 2026-10-04).** Haatim applies himself with each site's autofill.
+  The bot's job is a tailored resume + cover letter for every alert (`tailor_alerts`), and on
+  request ("resume for <company>" or a pasted job link). Packet / fill / watcher / remote-filler
+  code is disabled (`application_packets: false`); don't re-enable it unless asked.
 - Ask before ticking any agreement or policy acknowledgment on an application.
 - Don't guess facts on applications (address, GPA, dates): leave them flagged for Haatim.
 - Back up files on the VPS before changing anything outside git (crontab, systemd, /etc).
