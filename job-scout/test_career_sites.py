@@ -240,3 +240,36 @@ def test_new_grad_titles_are_not_internships():
     # "University Grad Software Engineer 2027 (USA)" got an application packet
     assert not _match("University Grad Software Engineer 2027 (USA)")
     assert _match("Software Engineer Intern 2027 (USA)")
+
+
+class TestTailorAlerts:
+    @pytest.fixture
+    def scraper(self, monkeypatch):
+        import logging
+        monkeypatch.setattr(logging, "basicConfig", lambda **kw: None)
+        import scraper
+        monkeypatch.setattr(scraper, "CHANNEL_ID", "123")
+        return scraper
+
+    def test_tailors_each_alert_and_passes_long_descriptions(self, scraper):
+        calls = []
+
+        def runner(cmd, **kw):
+            calls.append(cmd)
+            if "--jd-file" in cmd:
+                assert open(cmd[cmd.index("--jd-file") + 1]).read().startswith("Build")
+            return type("R", (), {"returncode": 0, "stderr": ""})()
+
+        jobs = [{"job_url": "https://x/1", "description": "Build " + "things " * 100},
+                {"job_url": "https://x/2", "description": "Terms: Summer 2027"}]   # Simplify-style, no JD
+        assert scraper.tailor_alerts(jobs, runner=runner) == 2
+        assert calls[0][2:4] == ["https://x/1", "123"] and "--jd-file" in calls[0]
+        assert calls[1][2:] == ["https://x/2", "123"]   # tailor.py fetches the posting itself
+
+    def test_failure_is_logged_not_raised(self, scraper):
+        def runner(cmd, **kw):
+            raise TimeoutError("slow")
+        assert scraper.tailor_alerts([{"job_url": "https://x/1"}], runner=runner) == 0
+
+    def test_packets_are_off_by_default(self, scraper):
+        assert scraper.APPLICATION_PACKETS is False and scraper.TAILOR_EVERY_ALERT is True

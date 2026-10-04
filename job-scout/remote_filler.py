@@ -45,7 +45,7 @@ MAX_OPEN = int(os.getenv("REMOTE_FILLER_MAX_TABS", "12"))
 POLL_SECONDS = 30
 
 CONFIRMATION = re.compile(r"thank(s| you) for (applying|your application)|application (was |has been )?"
-                          r"(submitted|received)|we('ve| have) received your application", re.I)
+                          r"(successfully )?(submitted|received)|we('ve| have) received your application", re.I)
 
 
 # ── Planning (pure, no browser: tested in test_remote_filler.py) ──────────────

@@ -64,6 +64,7 @@ def test_date_value(text, expected):
 def test_confirmation_pattern():
     assert rf.CONFIRMATION.search("Thank you for applying to Figma!")
     assert rf.CONFIRMATION.search("Your application has been submitted.")
+    assert rf.CONFIRMATION.search("Success. Your application was successfully submitted.")   # Ashby
     assert not rf.CONFIRMATION.search("Apply for this job")
 
 

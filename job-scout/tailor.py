@@ -507,7 +507,8 @@ async def send_to_discord(channel_id, job_url, resume_pdf, cover_pdf, analysis):
                 await channel.send(f"Tailor failed: {error}")
             else:
                 msg = await channel.send(
-                    content=f"**{role} @ {company}**\n{job_url}",
+                    content=f"📎 **Tailored resume + cover letter:** {role} @ {company}"
+                            + (f"\n<{job_url}>" if job_url else ""),
                     files=files or discord.utils.MISSING
                 )
                 if job_url and resume_pdf and os.path.exists(resume_pdf):

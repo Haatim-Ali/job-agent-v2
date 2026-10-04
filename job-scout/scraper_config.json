@@ -136,5 +136,8 @@
     "account executive",
     "recruit",
     "marketing"
-  ]
+  ],
+  "tailor_every_alert": true,
+  "max_tailored_per_run": 15,
+  "application_packets": false
 }

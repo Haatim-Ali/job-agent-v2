@@ -70,6 +70,14 @@ ROLE_KEYWORDS = _cfg.get("role_keywords", [])
 INTERN_KEYWORDS = _cfg.get("intern_keywords", [])
 CAREER_SITE_EXCLUDE_TITLES = _cfg.get("career_site_exclude_titles", [])
 REPOST_SIGNALS = _cfg["repost_signals"]
+# Every alert gets its tailored resume + cover letter posted under it (tailor_alerts).
+TAILOR_EVERY_ALERT = _cfg.get("tailor_every_alert", True)
+MAX_TAILORED_PER_RUN = _cfg.get("max_tailored_per_run", 15)
+# Application packets (form answers for autofilling) are off since 2026-10-04: Haatim fills
+# forms with each site's own autofill and the tailored resume. The code is kept.
+APPLICATION_PACKETS = _cfg.get("application_packets", False)
+CHANNEL_ID = os.getenv("DISCORD_CHANNEL_ID")
+_alerted_jobs = []   # jobs alerted this run, tailored at the end of the run
 
 
 def init_db():
@@ -523,12 +531,13 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
             continue
 
         send_discord_alert(job_dict, analysis, is_repost=repost)
+        _alerted_jobs.append(job_dict)
         if from_career_site:
-            if apply_prep.enqueue(conn, job_dict, analysis.get("fit_score")):
+            if APPLICATION_PACKETS and apply_prep.enqueue(conn, job_dict, analysis.get("fit_score")):
                 logging.info(f"Queued for application packet: {job_dict.get('title')} @ {job_dict.get('company')}")
             if apply_prep.learn_board(conn, job_dict, "simplify" if job_dict.get("from_simplify") else "career site"):
                 logging.info(f"Learned job board {job_dict.get('site')}/{job_dict.get('board')}")
-        else:
+        elif APPLICATION_PACKETS:
             # LinkedIn hides the application link; look for the same role on the company's own board
             try:
                 ats_job = apply_prep.find_on_ats(job_dict.get("company"), job_dict.get("title"),
@@ -545,6 +554,40 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
         logging.info(f"Alerted: {job_dict.get('title')} @ {job_dict.get('company')} (score {analysis.get('fit_score')})")
 
     return alerted
+
+
+def tailor_alerts(jobs, runner=subprocess.run):
+    """Tailored resume + cover letter for each alerted job, posted to #job-alerts by tailor.py
+    right under the alert. Runs after scraping so alerts go out first; one job at a time, each
+    in its own process (tailor.py configures its own logging and Discord client).
+    Descriptions under 400 characters (e.g. SimplifyJobs listings, which have none) are left
+    for tailor.py to fetch from the posting itself."""
+    import tempfile
+    tailor_py = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tailor.py")
+    done = 0
+    for job in jobs:
+        cmd = [sys.executable, tailor_py, job["job_url"], str(CHANNEL_ID)]
+        desc = str(job.get("description") or "")
+        jd_path = None
+        if len(desc) >= 400:
+            with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False, encoding="utf-8") as f:
+                f.write(desc)
+                jd_path = f.name
+            cmd += ["--jd-file", jd_path]
+        try:
+            result = runner(cmd, capture_output=True, text=True, timeout=300)
+            if result.returncode == 0:
+                done += 1
+            else:
+                logging.error(f"Tailoring failed for {job['job_url']}: {result.stderr[-300:]}")
+        except Exception as e:
+            logging.error(f"Tailoring failed for {job['job_url']}: {e}")
+        finally:
+            if jd_path and os.path.exists(jd_path):
+                os.remove(jd_path)
+    if jobs:
+        logging.info(f"Tailored {done}/{len(jobs)} alerted job(s)")
+    return done
 
 
 def run():
@@ -595,9 +638,12 @@ def _run():
 
     conn.close()
 
+    if TAILOR_EVERY_ALERT and not _claude_unavailable:
+        tailor_alerts(_alerted_jobs[:MAX_TAILORED_PER_RUN])
+
     # Build application packets for a few queued jobs (separate process: tailoring is slow
     # and configures its own logging)
-    if not _claude_unavailable:
+    if APPLICATION_PACKETS and not _claude_unavailable:
         try:
             subprocess.run(
                 [sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), "apply_prep.py"),
