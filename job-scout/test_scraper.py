@@ -185,6 +185,24 @@ class TestIsRepostByTitle:
     def test_empty_db_not_repost(self):
         assert self.fn(self.conn, "SDR", "Acme Corp") is False
 
+    # Regression 2026-10-04: General Motors' 4 internships were alerted twice each, once from
+    # the Simplify list and once from LinkedIn, because the titles were worded differently
+    def test_differently_worded_titles_are_the_same_job(self):
+        self._insert("Machine Learning Engineer Intern - AV/AI Platform", "General Motors")
+        assert self.fn(self.conn, "2027 Summer Intern – Machine Learning Engineer, AV/AI Platform",
+                       "General Motors") is True
+        self._insert("AI/ML Engineer Intern - Autonomous Vehicle: Simulation", "General Motors")
+        assert self.fn(self.conn, "2027 Summer Intern - AI/ML Engineer, Autonomous Vehicle: Simulation",
+                       "General Motors") is True
+
+    def test_different_roles_at_same_company_stay_separate(self):
+        self._insert("Machine Learning Engineer Intern - AV/AI Platform", "General Motors")
+        assert self.fn(self.conn, "Software Engineer Intern - AV/AI Platform", "General Motors") is False
+
+    def test_company_punctuation_ignored(self):
+        self._insert("Robot Software Engineer Intern", "Rhoda AI")
+        assert self.fn(self.conn, "Robot Software Engineer Internship", "Rhoda-Ai") is True
+
 
 # ── passes_or_filter repost fallback ──────────────────────────────────────────
 
