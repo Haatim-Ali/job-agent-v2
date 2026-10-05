@@ -223,8 +223,22 @@ def _write_rejection_to_vault(title, company, reason):
         logging.warning(f"Vault write failed: {e}")
 
 
+_TAILORED = _re.compile(r"Tailored resume \+ cover letter:\*\*\s*(?P<role>.+?) @ (?P<company>[^\n]+)\n<?(?P<url>https?://[^\s>]+)")
+
+
+def parse_tailored_message(content):
+    """(job_url, title, company) from a "📎 Tailored resume + cover letter: <role> @ <company>"
+    message (posted by tailor.py), so ✅ works on it as well as on the alert card. Else None."""
+    m = _TAILORED.search(content or "")
+    return (m.group("url"), m.group("role").strip(), m.group("company").strip()) if m else None
+
+
 def _extract_job_info(message, channel_id):
-    """Extract (job_url, title, company) from an embed or plain message."""
+    """Extract (job_url, title, company) from an alert embed, a tailored-files message, or a
+    plain #requests message."""
+    tailored = parse_tailored_message(message.content)
+    if tailored:
+        return tailored
     # Try embeds first (job alert channel)
     if message.embeds:
         embed = message.embeds[0]

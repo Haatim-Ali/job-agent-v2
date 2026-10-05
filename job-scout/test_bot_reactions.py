@@ -30,3 +30,11 @@ def test_check_mark_no_longer_tailors():
 def test_help_text_matches_mapping():
     assert "👍 — generate tailored resume" in bot.HELP_TEXT
     assert "✅ — mark as applied" in bot.HELP_TEXT
+
+
+def test_check_mark_works_on_tailored_files_message():
+    content = ("📎 **Tailored resume + cover letter:** Software Engineer Intern @ Glean\n"
+               "<https://job-boards.greenhouse.io/gleanwork/jobs/4595665005>")
+    assert bot.parse_tailored_message(content) == (
+        "https://job-boards.greenhouse.io/gleanwork/jobs/4595665005", "Software Engineer Intern", "Glean")
+    assert bot.parse_tailored_message("GAPS TO PREPARE FOR:") is None
