@@ -199,6 +199,11 @@ class TestIsRepostByTitle:
         self._insert("Machine Learning Engineer Intern - AV/AI Platform", "General Motors")
         assert self.fn(self.conn, "Software Engineer Intern - AV/AI Platform", "General Motors") is False
 
+    def test_different_seasons_stay_separate(self):
+        self._insert("Spring 2027 Software Engineering Internship/Co-op", "SpaceXAI")
+        assert self.fn(self.conn, "Summer 2027 Software Engineering Internship/Co-op", "SpaceXAI") is False
+        assert self.fn(self.conn, "Software Engineering Internship", "SpaceXAI") is True   # no season named
+
     def test_company_punctuation_ignored(self):
         self._insert("Robot Software Engineer Intern", "Rhoda AI")
         assert self.fn(self.conn, "Robot Software Engineer Internship", "Rhoda-Ai") is True

@@ -245,16 +245,25 @@ def passes_or_filter(job, is_repost=False):
     return True, age_hours, applicant_count
 
 
-_TITLE_FILLER = {"intern", "interns", "internship", "internships", "summer", "fall", "winter", "spring",
+_SEASONS = {"summer", "fall", "autumn", "winter", "spring"}
+_TITLE_FILLER = {"intern", "interns", "internship", "internships",
                  "co", "op", "coop", "the", "a", "an", "of", "and", "for", "at", "to", "in"}
 
 
 def title_key(title):
-    """A title reduced to its meaningful words, order-free: years, seasons, "intern" and
-    punctuation dropped. "2027 Summer Intern – Machine Learning Engineer, AV/AI Platform" and
-    "Machine Learning Engineer Intern - AV/AI Platform" give the same key."""
-    words = re.findall(r"[a-z0-9]+", str(title).lower())
-    return frozenset(w for w in words if w not in _TITLE_FILLER and not re.fullmatch(r"20\d\d", w))
+    """(core words, seasons) of a title, order-free, with years, "intern" and punctuation
+    dropped. "2027 Summer Intern – Machine Learning Engineer, AV/AI Platform" and "Machine
+    Learning Engineer Intern - AV/AI Platform" share a core; seasons are kept apart so a
+    Spring and a Summer program at one company stay two jobs."""
+    words = [w for w in re.findall(r"[a-z0-9]+", str(title).lower()) if not re.fullmatch(r"20\d\d", w)]
+    seasons = frozenset(w for w in words if w in _SEASONS)
+    core = frozenset(w for w in words if w not in _TITLE_FILLER and w not in _SEASONS)
+    return core, seasons
+
+
+def same_role(title_a, title_b):
+    (core_a, sea_a), (core_b, sea_b) = title_key(title_a), title_key(title_b)
+    return bool(core_a) and core_a == core_b and (not sea_a or not sea_b or sea_a == sea_b)
 
 
 def _company_key(company):
@@ -265,8 +274,8 @@ def is_repost_by_title(conn, title, company):
     """True if the same role at the same company was seen in the last 7 days, under any wording
     (catches URL-refreshed reposts, and the same job arriving from LinkedIn and a company board
     or the Simplify list with differently worded titles)."""
-    key, ckey = title_key(title), _company_key(company)
-    if not key or not ckey:
+    ckey = _company_key(company)
+    if not title_key(title)[0] or not ckey:
         return False
     first = ckey.split()[0]
     rows = conn.execute(
@@ -274,7 +283,7 @@ def is_repost_by_title(conn, title, company):
            WHERE lower(company) LIKE ? AND date_found > datetime('now', '-7 days')""",
         (f"%{first}%",),
     ).fetchall()
-    return any(_company_key(c) == ckey and title_key(t) == key for t, c in rows)
+    return any(_company_key(c) == ckey and same_role(title, t) for t, c in rows)
 
 
 def get_rejection_context():
