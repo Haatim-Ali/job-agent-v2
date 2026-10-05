@@ -384,7 +384,7 @@ It catches "5+ years of experience," "minimum of 7 years" and "10+ yrs," and ign
 
 ### 5. Duplicates and reposts
 
-- **7-day title check.** `is_repost_by_title` runs `SELECT 1 FROM seen_jobs WHERE lower(title) = lower(?) AND lower(company) = lower(?) AND date_found > datetime('now', '-7 days')`. The same role often appears under several URLs (LinkedIn and the career site, or a refreshed listing), and this keeps you from getting alerted twice.
+- **7-day same-role check.** `is_repost_by_title` compares the job with everything from the same company seen in the last 7 days, by **meaning, not exact wording**: `title_key` reduces a title to its core words (order-free, with years, "intern", filler and punctuation dropped), so "2027 Summer Intern – Machine Learning Engineer, AV/AI Platform" (LinkedIn) and "Machine Learning Engineer Intern - AV/AI Platform" (Simplify) count as one job. Seasons are kept apart: a Spring and a Summer program are two jobs, but a title with no season matches either. Company names ignore punctuation ("Rhoda AI" = "Rhoda-Ai"). Until 2026-10-04 this check required identical titles, and 10 of the 120 alerts since Oct 1 were duplicates (General Motors' 4 internships each came twice).
 - **Repost signals.** `detect_repost` looks for words like "reposting" or "re-opening" in the title and first 600 characters of the description. A repost is still considered, but its "fresh" timestamp isn't trusted.
 
 ### 6. Freshness OR filter (LinkedIn only)
@@ -993,6 +993,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 # Changelog
 
 **2026-10-01 (evening): status check and doc audit.** The VPS runs commit `4060f85`, matching the private repo. In the day's 23 scraper runs it alerted **38 jobs**, with a few one-off connection timeouts to Greenhouse/Lever boards that were skipped and retried on the next run (expected "fail soft" behavior). Application queue: **5 submitted** (Figma, Waymo, Muon Space, Pinterest, Robinhood), 3 ready (Trajectory, Quadric AI Kernel Engineer, Rhoda AI), others being prepared or skipped. Doc updates: disclosure-question rule, which contact details go on documents vs forms, and the resume template's one deliberate difference from `Haatim_Ali_Resume.pdf` (Fremont).
+
+**2026-10-04: duplicate alerts fixed.** The same-role check now matches reworded titles (core words, seasons kept apart) instead of identical text. Replayed against the 120 alerts since Oct 1, it would have caught 10 true duplicates and no different jobs.
 
 **2026-10-04: tailored files with every alert; form filling switched off.** Every alert now gets its tailored resume and cover letter posted under it (`tailor_alerts` in `scraper.py`). Application packets, the Mac fill skill, the watcher and the remote filler are disabled: Haatim uses each site's own autofill. Remote-browser services (Xvfb, x11vnc, noVNC, filler) removed from the VPS; Tailscale stopped. Before the switch, 6 applications were submitted with the fill flow (Figma, Waymo, Muon Space, Pinterest, Robinhood, Trajectory, Quadric AI Kernel).
 
