@@ -190,7 +190,8 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
                        for m, b in originals.items()})
     try:
         edits = ask_json(client, resume_tailor.build_prompt(originals, analysis, custom_prompt, job_description),
-                         edit_schema, max_tokens=16000, temperature=0.3)
+                         edit_schema, max_tokens=16000, temperature=0.3,
+                         effort=EFFORT["edits"], label="resume edits")
     except Exception as e:
         logging.warning(f"Resume edit pass failed, using baseline resume: {e}")
 
@@ -201,7 +202,7 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
         try:
             verdict = ask_json(client, resume_tailor.build_verify_prompt(pairs),
                                obj({"rejected": arr(obj({"id": STR, "reason": STR}))}),
-                               max_tokens=16000, temperature=0)
+                               max_tokens=16000, temperature=0, effort=EFFORT["verify"], label="fact-check")
             rejected = [r for r in verdict.get("rejected", []) if isinstance(r, dict)]
         except Exception as e:
             # If the check can't run, don't trust the edits: fall back to the baseline wording
@@ -256,7 +257,7 @@ def trim_cover_to_one_page(data, slug, client, output_dir):
 Current paragraphs:
 P1: {cl.get('paragraph_1', '')}
 P2: {cl.get('paragraph_2', '')}
-P3: {cl.get('paragraph_3', '')}""", COVER_SCHEMA, max_tokens=16000)
+P3: {cl.get('paragraph_3', '')}""", COVER_SCHEMA, max_tokens=16000, effort=EFFORT["trim"], label="cover trim")
         if shorter:
             updated = {**data, 'cover_letter': shorter}
             cover_tex = build_cover_tex(updated)
@@ -356,6 +357,14 @@ def parse_json_response(text):
         return {}
 
 
+# Thinking effort per step. Simple extraction steps think little; writing and judging think more.
+# TAILOR_EFFORT=default in the environment sends no effort at all (the model's own default),
+# which is how the before/after comparison was measured.
+EFFORT = {"analyze": "low", "match": "low", "cover": "medium", "edits": "medium",
+          "verify": "medium", "trim": "low"}
+if os.getenv("TAILOR_EFFORT") == "default":
+    EFFORT = {k: None for k in EFFORT}
+
 GAPS_SCHEMA = arr(obj({"gap": STR, "talking_point": STR}))
 COVER_SCHEMA = obj({"date": STR, "paragraph_1": STR, "paragraph_2": STR, "paragraph_3": STR})
 ANALYSIS_SCHEMA = obj({
@@ -389,7 +398,7 @@ def tailor(job_url, job_description=None, custom_prompt=""):
 role_title: the exact job title. company: the company name. company_slug: lowercase-hyphenated,
 for filenames. must_have: 3-5 required qualifications. nice_to_have: 2-3 preferred ones.
 ats_keywords: 12-15 keywords an applicant tracking system would scan for. tone: the posting's voice.""",
-            ANALYSIS_SCHEMA, max_tokens=16000)
+            ANALYSIS_SCHEMA, max_tokens=16000, effort=EFFORT["analyze"], label="analyze")
     except (ClaudeJSONError, anthropic.APIError, ValueError) as e:
         logging.warning(f"Pass 1 failed, using defaults: {e}")
         analysis = {"role_title": "Role", "company": "Company", "company_slug": "company"}
@@ -406,7 +415,8 @@ ATS keywords: {json.dumps(analysis.get("ats_keywords", []))}
 lead_experience: which experience (AIEA Lab or Montessori) best fits this role, and why.
 cover_letter_angle: one specific story that best fits this role.
 gaps: requirements the candidate doesn't clearly meet, each with a talking point.""",
-            MATCHING_SCHEMA, max_tokens=16000, system=kb_system)
+            MATCHING_SCHEMA, max_tokens=16000, system=kb_system,
+            effort=EFFORT["match"], label="match")
     except (ClaudeJSONError, anthropic.APIError, ValueError) as e:
         logging.warning(f"Pass 2 failed, continuing without it: {e}")
         matching = {"cover_letter_angle": "", "gaps": []}
@@ -436,7 +446,7 @@ Matching: {json.dumps(matching)}
 Also list gaps (requirement + talking point).""",
             {"type": "object", "properties": {"cover_letter": COVER_SCHEMA, "gaps": GAPS_SCHEMA},
              "required": ["cover_letter", "gaps"], "additionalProperties": False},
-            max_tokens=16000, system=kb_system)
+            max_tokens=16000, system=kb_system, effort=EFFORT["cover"], label="cover")
     except (ClaudeJSONError, anthropic.APIError, ValueError) as e:
         logging.error(f"Pass 3 failed: {e}")
         structured = None

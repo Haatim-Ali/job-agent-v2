@@ -76,3 +76,13 @@ def test_refusal_retries_once_on_fallback_model():
 
     assert cj.ask_json(Client(), "hi", cj.obj({"ok": cj.BOOL}), model="claude-sonnet-5-5", temperature=0.3) == {"ok": True}
     assert calls == ["claude-sonnet-5-5", cj.FALLBACK_MODEL]
+
+
+def test_effort_sent_except_to_haiku():
+    client = Fake()
+    cj.ask_json(client, "hi", cj.obj({"ok": cj.BOOL}), model="claude-sonnet-5-5", effort="low")
+    assert client.sent["output_config"]["effort"] == "low"
+    cj.ask_json(client, "hi", cj.obj({"ok": cj.BOOL}), model="claude-haiku-4-5-20251001", effort="low")
+    assert "effort" not in client.sent["output_config"]
+    cj.ask_json(client, "hi", cj.obj({"ok": cj.BOOL}), model="claude-sonnet-5-5")
+    assert "effort" not in client.sent["output_config"]

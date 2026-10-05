@@ -62,29 +62,43 @@ def cached_system(text):
 
 
 def ask_json(client, prompt, schema, *, model=DRAFT_MODEL, max_tokens=16000, system=None,
-             temperature=None):
+             temperature=None, effort=None, label=""):
     """Send one prompt, get back a dict guaranteed to match `schema`.
+    effort ("low" / "medium" / "high"): how much the model thinks before answering. Thinking is
+    billed as output tokens, so simple steps use "low". Ignored for models without effort.
     Raises ClaudeJSONError on a refusal or a reply cut off by max_tokens."""
+    output_config = {"format": {"type": "json_schema", "schema": schema}}
+    if effort and not model.startswith("claude-haiku"):
+        output_config["effort"] = effort
     params = {
         "model": model, "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
-        "output_config": {"format": {"type": "json_schema", "schema": schema}},
+        "output_config": output_config,
         **sampling(model, temperature),
     }
     if system:
         params["system"] = system
     resp = client.messages.create(**params)
+    log_usage(resp, model, label)
     if resp.stop_reason == "refusal" and model != FALLBACK_MODEL and model != SCORE_MODEL:
         logging.warning(f"{model} declined; retrying on {FALLBACK_MODEL}")
         return ask_json(client, prompt, schema, model=FALLBACK_MODEL, max_tokens=max_tokens,
-                        system=system, temperature=temperature)
+                        system=system, temperature=temperature, effort=effort, label=label)
     if resp.stop_reason in ("refusal", "max_tokens"):
         raise ClaudeJSONError(f"stop_reason={resp.stop_reason}")
-    usage = getattr(resp, "usage", None)
-    if usage is not None and getattr(usage, "cache_read_input_tokens", 0):
-        logging.info(f"Prompt cache hit: {usage.cache_read_input_tokens} tokens")
     text = next(b.text for b in resp.content if b.type == "text")
     return json.loads(text)
+
+
+def log_usage(resp, model, label=""):
+    """One log line per Claude call ("Claude usage: ..."), so spend can be measured from the logs."""
+    u = getattr(resp, "usage", None)
+    if u is None:
+        return
+    get = lambda name: getattr(u, name, 0) or 0
+    logging.info(f"Claude usage: {label or '-'} {model} in={get('input_tokens')} "
+                 f"cache_read={get('cache_read_input_tokens')} cache_write={get('cache_creation_input_tokens')} "
+                 f"out={get('output_tokens')}")
 
 
 def kb_system_text(kb):
