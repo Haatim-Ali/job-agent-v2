@@ -29,7 +29,8 @@
     "groq",
     "together ai",
     "perplexity",
-    "cursor"
+    "cursor",
+    "sephora"
   ],
   "exclude_industries": [],
   "exclude_companies": [
@@ -94,7 +95,10 @@
     "workday": [
       "nvidia|wd5|NVIDIAExternalCareerSite"
     ],
-    "simplify": true
+    "simplify": true,
+    "successfactors": [
+      "Sephora|https://jobs.sephora.com"
+    ]
   },
   "role_keywords": [
     "software",
@@ -139,5 +143,8 @@
   ],
   "tailor_every_alert": true,
   "max_tailored_per_run": 15,
-  "application_packets": false
+  "application_packets": false,
+  "watch_internships": [
+    "sephora"
+  ]
 }

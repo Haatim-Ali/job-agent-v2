@@ -66,6 +66,8 @@ WATCHLIST_COMPANIES = _cfg["watchlist_companies"]
 EXCLUDE_INDUSTRIES = _cfg["exclude_industries"]
 EXCLUDE_COMPANIES = [c.lower() for c in _cfg.get("exclude_companies", [])]
 CAREER_SITES = _cfg.get("career_sites", {})
+# Companies where every internship is alerted, whatever the role or fit score (e.g. Sephora)
+WATCH_INTERNSHIPS = _cfg.get("watch_internships", [])
 ROLE_KEYWORDS = _cfg.get("role_keywords", [])
 INTERN_KEYWORDS = _cfg.get("intern_keywords", [])
 CAREER_SITE_EXCLUDE_TITLES = _cfg.get("career_site_exclude_titles", [])
@@ -456,9 +458,11 @@ def send_discord_alert(job, analysis, is_repost=False):
         flags.append(f"🔥 FRESH -- posted {age_hours:.0f}h ago")
     if is_watchlist:
         flags.append("⭐ WATCHLIST COMPANY")
+    if job.get("watched"):
+        flags.append("👀 WATCHED COMPANY INTERNSHIP")
     if job.get("from_simplify"):
         flags.append("📋 FROM SIMPLIFY INTERNSHIP LIST")
-    elif job.get("site") in ("greenhouse", "lever", "ashby", "amazon", "smartrecruiters", "workday"):
+    elif job.get("site") in ("greenhouse", "lever", "ashby", "amazon", "smartrecruiters", "workday", "successfactors"):
         flags.append("🏢 FROM COMPANY CAREER SITE")
     if applicants is not None:
         try:
@@ -555,7 +559,9 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
             continue
 
         min_score = 5
-        if not analysis.get("relevant") or analysis.get("fit_score", 0) < min_score:
+        if job_dict.get("watched"):
+            pass   # watched-company internship: always alerted; the score is just shown
+        elif not analysis.get("relevant") or analysis.get("fit_score", 0) < min_score:
             logging.info(f"Claude filtered: {job_dict.get('title')} @ {job_dict.get('company')} -- {analysis.get('reason')}")
             mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
             continue
@@ -640,7 +646,8 @@ def _run():
     # Company career sites first -- they often list roles before LinkedIn does
     try:
         sites = apply_prep.with_learned_boards(CAREER_SITES, conn)
-        postings = career_sites.fetch_all(sites, ROLE_KEYWORDS, INTERN_KEYWORDS, CAREER_SITE_EXCLUDE_TITLES)
+        postings = career_sites.fetch_all(sites, ROLE_KEYWORDS, INTERN_KEYWORDS, CAREER_SITE_EXCLUDE_TITLES,
+                                          watch=WATCH_INTERNSHIPS)
         total_alerted += process_jobs(postings, conn, from_career_site=True)
     except Exception as e:
         logging.error(f"Career sites step failed: {e}")

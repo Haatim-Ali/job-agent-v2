@@ -41,6 +41,12 @@ def _parse_dt(value):
     try:  # Amazon: "September 24, 2026"
         return datetime.strptime(value, "%B %d, %Y").replace(tzinfo=timezone.utc)
     except ValueError:
+        pass
+    try:  # RSS: "Tue, 06 Oct 2026 2:00:00 GMT"
+        from email.utils import parsedate_to_datetime
+        dt = parsedate_to_datetime(value)
+        return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError, IndexError):
         return None
 
 
@@ -210,6 +216,26 @@ def fetch_workday(spec, pages=5, max_age_hours=72):
     return jobs
 
 
+def fetch_successfactors(spec):
+    """SAP SuccessFactors career sites (e.g. Sephora's jobs.sephora.com) publish an RSS feed of
+    their newest postings, with full descriptions. spec: "Company|https://jobs.example.com".
+    The feed holds the 20 newest postings site-wide; checked every 30 minutes that's plenty."""
+    import xml.etree.ElementTree as ET
+    company, base = spec.split("|", 1)
+    resp = requests.get(f"{base.rstrip('/')}/services/rss/job/", params={"locale": "en_US"},
+                        headers={"User-Agent": "Mozilla/5.0"}, timeout=TIMEOUT)
+    resp.raise_for_status()
+    jobs = []
+    for item in ET.fromstring(resp.content).findall(".//item"):
+        raw = (item.findtext("title") or "").strip()
+        m = re.match(r"^(.*)\s+\(([^()]*)\)$", raw)   # "Title (City, ST, US, ...)"
+        title, location = (m.group(1), m.group(2)) if m else (raw, "")
+        jobs.append(_job(title, company, location, (item.findtext("link") or "").strip(),
+                         _html_to_text(item.findtext("description")), _parse_dt(item.findtext("pubDate")),
+                         "successfactors", base))
+    return jobs
+
+
 SIMPLIFY_URL = "https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/.github/scripts/listings.json"
 GRAD_ONLY = {"Master's", "PhD", "MBA"}
 
@@ -272,8 +298,19 @@ def title_matches(title, role_keywords, intern_keywords, exclude_titles):
     return is_intern and any(k in t for k in role_keywords)
 
 
-def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles):
-    """Return recent, title-matching postings from every configured career site."""
+def is_watched_internship(job, watch, intern_keywords):
+    """Any internship at a company on the watch list, whatever the role (e.g. every Sephora
+    internship), so it's alerted even when it isn't a tech role."""
+    company = str(job.get("company", "")).lower()
+    if not any(w.lower() in company for w in watch):
+        return False
+    t = f" {str(job.get('title', '')).lower()} "
+    return any(re.search(rf"\b{re.escape(k)}s?\b", t) for k in intern_keywords)
+
+
+def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=()):
+    """Return recent, title-matching postings from every configured career site. Internships at
+    watched companies are kept whatever the role, and marked job["watched"] = True."""
     max_age = timedelta(hours=cfg.get("max_age_hours", 72))
     now = datetime.now(timezone.utc)
 
@@ -283,6 +320,7 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles):
         + [(fetch_ashby, b) for b in cfg.get("ashby", [])]
         + [(fetch_smartrecruiters, c) for c in cfg.get("smartrecruiters", [])]
         + [(fetch_workday, w) for w in cfg.get("workday", [])]
+        + [(fetch_successfactors, s) for s in cfg.get("successfactors", [])]
         + [(fetch_amazon, q) for q in cfg.get("amazon_queries", [])]
         + ([(lambda _: fetch_simplify(), "simplify")] if cfg.get("simplify", True) else [])
     )
@@ -298,8 +336,10 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles):
         for job in jobs:
             if not job["job_url"] or job["job_url"] in seen_urls:
                 continue
-            if not title_matches(job["title"], role_keywords, intern_keywords, exclude_titles):
+            watched = is_watched_internship(job, watch, intern_keywords)
+            if not watched and not title_matches(job["title"], role_keywords, intern_keywords, exclude_titles):
                 continue
+            job["watched"] = watched
             posted = job["date_posted"]
             if posted is None or now - posted > max_age:
                 continue

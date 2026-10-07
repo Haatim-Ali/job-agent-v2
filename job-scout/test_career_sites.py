@@ -273,3 +273,38 @@ class TestTailorAlerts:
 
     def test_packets_are_off_by_default(self, scraper):
         assert scraper.APPLICATION_PACKETS is False and scraper.TAILOR_EVERY_ALERT is True
+
+
+class TestSephoraWatch:
+    RSS = b"""<?xml version="1.0"?><rss version="2.0"><channel>
+      <item><title>Summer 2027 Merchandising Intern (San Francisco, CA, US, 94105)</title>
+        <link>https://jobs.sephora.com/USA/job/San-Francisco-Merchandising-Intern/1/</link>
+        <pubDate>Tue, 06 Oct 2026 2:00:00 GMT</pubDate><description>&lt;p&gt;Join us&lt;/p&gt;</description></item>
+      <item><title>Seasonal Warehouse Associate (Avon, IN, US, USA_522899)</title>
+        <link>https://jobs.sephora.com/USA/job/Avon/2/</link>
+        <pubDate>Tue, 06 Oct 2026 2:00:00 GMT</pubDate><description>x</description></item>
+    </channel></rss>"""
+
+    def test_successfactors_rss(self, monkeypatch):
+        class Resp:
+            content = self.RSS
+
+            def raise_for_status(self):
+                pass
+
+        monkeypatch.setattr(cs.requests, "get", lambda *a, **k: Resp())
+        jobs = cs.fetch_successfactors("Sephora|https://jobs.sephora.com")
+        assert jobs[0]["title"] == "Summer 2027 Merchandising Intern"
+        assert jobs[0]["location"] == "San Francisco, CA, US, 94105"
+        assert jobs[0]["company"] == "Sephora" and jobs[0]["site"] == "successfactors"
+        assert jobs[0]["date_posted"].year == 2026 and "Join us" in jobs[0]["description"]
+
+    def test_any_sephora_internship_is_watched_even_non_tech(self):
+        kw = ["intern", "internship"]
+        assert cs.is_watched_internship({"company": "Sephora", "title": "Summer 2027 Merchandising Intern"}, ["sephora"], kw)
+        assert not cs.is_watched_internship({"company": "Sephora", "title": "Seasonal Warehouse Associate"}, ["sephora"], kw)
+        assert not cs.is_watched_internship({"company": "Ulta", "title": "Merchandising Intern"}, ["sephora"], kw)
+        assert not cs.is_watched_internship({"company": "Sephora", "title": "Internal Audit Manager"}, ["sephora"], kw)
+
+    def test_rss_date(self):
+        assert cs._parse_dt("Tue, 06 Oct 2026 2:00:00 GMT").day == 6

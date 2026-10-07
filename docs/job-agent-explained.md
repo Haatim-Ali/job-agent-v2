@@ -302,6 +302,10 @@ This is the same shape a JobSpy row has, so everything downstream (`process_jobs
 - **SmartRecruiters** has a documented, unauthenticated Posting API. The company id is the first path segment of a `jobs.smartrecruiters.com/<id>/...` link.
 - **[SimplifyJobs Summer 2027 Internships](https://github.com/SimplifyJobs/Summer2027-Internships)** is a community-maintained list (about 17,000 listings, around 4,400 open on 2026-10-01) that Simplify keeps fresh by scraping company career pages hourly. The bot downloads its `listings.json` once per run and keeps listings that are open, visible and not graduate-only (degrees listed as only Master's/PhD/MBA). It has no descriptions, so Claude scores these on title, company, locations and the listing's metadata (term, category, degrees, sponsorship), and the 📋 flag marks them in Discord. `_ats_from_url` recognizes when a listing's link is on Greenhouse, Lever, Ashby, SmartRecruiters or Workday; Greenhouse, Lever and Ashby ones get application packets like any career-site job. In the first trial, 159 of 3,738 open listings passed the title and age filters.
 
+- **SAP SuccessFactors** (Sephora's jobs.sephora.com, and many large companies) publishes an RSS feed of its 20 newest postings with full descriptions at `/services/rss/job/`; `fetch_successfactors` reads it (configured as `"Company|https://jobs.example.com"`).
+
+**Watched companies.** `watch_internships` in `scraper_config.json` (currently `["sephora"]`) lists companies where **every** internship is alerted, whatever the role: `is_watched_internship` keeps any posting from that company with a whole-word "intern"/"internship" in the title, past the role-keyword filter, and the scraper alerts it even if Claude's fit score is low (the score is still shown). These alerts carry a 👀 flag and, as watchlist companies, a gold color.
+
 **Learned boards.** When a job is alerted from a company's board (found through Simplify, a career site, or the LinkedIn lookup), that board is saved in the `learned_boards` table, and every later run checks it directly alongside `scraper_config.json`. The config file itself is never edited by code, so a deploy or rollback can't clobber it. The first board learned was Pinterest's.
 
 ### Details the adapters handle
@@ -993,6 +997,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 # Changelog
 
 **2026-10-01 (evening): status check and doc audit.** The VPS runs commit `4060f85`, matching the private repo. In the day's 23 scraper runs it alerted **38 jobs**, with a few one-off connection timeouts to Greenhouse/Lever boards that were skipped and retried on the next run (expected "fail soft" behavior). Application queue: **5 submitted** (Figma, Waymo, Muon Space, Pinterest, Robinhood), 3 ready (Trajectory, Quadric AI Kernel Engineer, Rhoda AI), others being prepared or skipped. Doc updates: disclosure-question rule, which contact details go on documents vs forms, and the resume template's one deliberate difference from `Haatim_Ali_Resume.pdf` (Fremont).
+
+**2026-10-06: Sephora internship watch.** New SuccessFactors source (RSS) for jobs.sephora.com and `watch_internships`: every Sephora internship is alerted with a 👀 flag regardless of role or score. Sephora had no internships posted at setup.
 
 **2026-10-04: duplicate alerts fixed.** The same-role check now matches reworded titles (core words, seasons kept apart) instead of identical text. Replayed against the 120 alerts since Oct 1, it would have caught 10 true duplicates and no different jobs.
 
