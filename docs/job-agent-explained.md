@@ -63,7 +63,7 @@ flowchart TB
 
 There are five places this system touches, and it helps to keep them straight:
 
-1. **The VPS** (`srv1856705.hstgr.cloud`, IP `2.25.82.228`), rented from Hostinger. All the automation runs here. It is a virtual machine running **Debian 13** Linux with 2 CPU cores, 7.8 GB of memory and a 99 GB disk (10% used). The code lives in `/home/Haatim/job-agent/job-scout`.
+1. **The VPS** (its address lives only in `~/.ssh/config` on your Mac, under the alias `jobagent-vps`, never in the public repo), rented from Hostinger. All the automation runs here. It is a virtual machine running **Debian 13** Linux with 2 CPU cores, 7.8 GB of memory and a 99 GB disk (10% used). The code lives in `/home/Haatim/job-agent/job-scout`.
 2. **Your Mac.** The development copy of the code (`~/job-agent`, a git repository on branch `vps`), this document, and the Claude Code skills. Submitting applications happens here, in your own Chrome.
 3. **Discord.** Where alerts arrive and where you react.
 4. **Google Sheets.** Your tracker spreadsheet.
@@ -130,7 +130,7 @@ A **VPS** (virtual private server) is a slice of a physical server in a data cen
 
 ## Getting in: SSH
 
-**SSH** (Secure Shell) is an encrypted remote terminal. When Claude runs `ssh Haatim@2.25.82.228 '...'` from your Mac, the command executes on the VPS and the output comes back.
+**SSH** (Secure Shell) is an encrypted remote terminal. When Claude runs `ssh jobagent-vps '...'` from your Mac, the command executes on the VPS and the output comes back.
 
 Authentication uses a **key pair** instead of a password: a private key (`~/.ssh/id_ed25519` on your Mac, never shared) and a matching public key installed on the server. The server sends a challenge that only the private key can sign. `ed25519` is the name of the modern elliptic-curve algorithm used.
 
@@ -995,6 +995,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-11: repo made public, server address removed.** The repo is now `Haatim-Ali/job-agent-v2` (renamed from `job-agent-private`) and public. The VPS address, hostname and login no longer appear in the code or docs: `deploy.sh`, the README and this guide use the SSH alias `jobagent-vps`, defined only in `~/.ssh/config` on the Mac (`deploy.sh` also accepts `VPS=user@host`).
 
 **2026-10-01 (evening): status check and doc audit.** The VPS runs commit `4060f85`, matching the private repo. In the day's 23 scraper runs it alerted **38 jobs**, with a few one-off connection timeouts to Greenhouse/Lever boards that were skipped and retried on the next run (expected "fail soft" behavior). Application queue: **5 submitted** (Figma, Waymo, Muon Space, Pinterest, Robinhood), 3 ready (Trajectory, Quadric AI Kernel Engineer, Rhoda AI), others being prepared or skipped. Doc updates: disclosure-question rule, which contact details go on documents vs forms, and the resume template's one deliberate difference from `Haatim_Ali_Resume.pdf` (Fremont).
 

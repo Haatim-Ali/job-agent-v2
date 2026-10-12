@@ -8,7 +8,7 @@
 #      tests pass -> restart the Discord bot (the scraper picks up new code on its next cron run)
 set -euo pipefail
 
-VPS="Haatim@2.25.82.228"
+VPS="${VPS:-jobagent-vps}"   # an SSH alias in ~/.ssh/config (Host jobagent-vps / HostName / User), kept out of git
 BRANCH="vps"
 
 cd "$(dirname "$0")"

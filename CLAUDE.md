@@ -10,12 +10,13 @@ Full explanation of every component: `docs/job-agent-explained.md` (rendered to
 
 ## Where things live
 
-- **Repo:** branch `vps`, pushed to the **private** repo `Haatim-Ali/job-agent-private`
-  (git remote `private`). `origin` is a public fork (`Haatim-Ali/job-agent`) and `upstream` the
-  collaborator's original (`jsho0/job-agent`): never push job-bot work there, it contains
-  personal data.
-- **VPS:** `ssh Haatim@2.25.82.228`, code in `~/job-agent` (a git checkout of the private repo,
-  remote `origin` = private repo via deploy key), venv at `job-scout/venv`.
+- **Repo:** branch `vps`, pushed to `Haatim-Ali/job-agent-v2` (git remote `private`; renamed from
+  `job-agent-private` and made **public** on purpose, it's on Haatim's resume). Because it's public,
+  never commit secrets, personal data or the VPS address (use the `jobagent-vps` SSH alias).
+  `origin` is an old public fork (`Haatim-Ali/job-agent`) and `upstream` the collaborator's
+  original (`jsho0/job-agent`): don't push job-bot work there.
+- **VPS:** `ssh jobagent-vps` (an alias in `~/.ssh/config`; the address is not in git), code in `~/job-agent` (a git checkout of `job-agent-v2`,
+  remote `origin` = that repo via deploy key), venv at `job-scout/venv`.
   - Scraper: crontab, every 30 min with `flock -n /tmp/jobscraper.lock`
   - Bot: systemd service `jobscout-bot` (`sudo systemctl restart jobscout-bot`)
   - Backups: `backup_db.py` nightly at 3:15 to `~/backups` (14 kept)

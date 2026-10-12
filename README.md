@@ -38,7 +38,7 @@ cd job-scout && ../.venv/bin/python -m pytest -q --ignore=test_discord.py --igno
 bash deploy.sh
 
 # On the VPS
-ssh Haatim@2.25.82.228
+ssh jobagent-vps   # alias in ~/.ssh/config
 cd ~/job-agent/job-scout
 venv/bin/python apply_prep.py --list              # application queue
 venv/bin/python apply_prep.py --url <posting>     # build a packet now
