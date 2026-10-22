@@ -19,12 +19,13 @@ import json
 import logging
 import re
 
-SECTIONS = ["AIEA_BULLETS", "MONTESSORI_BULLETS", "PATHWISE_BULLETS", "JOBAGENT_BULLETS"]
+SECTIONS = ["AIEA_BULLETS", "MONTESSORI_BULLETS", "UPLINK_BULLETS", "PATHWISE_BULLETS", "JOBAGENT_BULLETS"]
 SECTION_LABELS = {
     "AIEA_BULLETS": "Undergraduate Research Assistant, Autonomous Vehicles (AIEA Lab)",
     "MONTESSORI_BULLETS": "Website Developer (Golden Harvest Montessori)",
+    "UPLINK_BULLETS": "Project: Uplink, Multi-Agent Food Rescue Negotiation (hackathon, team of 3)",
     "PATHWISE_BULLETS": "Project: Pathwise, Autonomous Planning Agent (hackathon)",
-    "JOBAGENT_BULLETS": "Project: JobAgent, AI-Powered Job Search Automation",
+    "JOBAGENT_BULLETS": "Project: JobAgent, Autonomous Internship Search & Tailoring Pipeline",
 }
 
 MAX_GROWTH = 1.05      # a reworded bullet may be at most 5% longer than the original...
@@ -293,4 +294,4 @@ Current bullets (text uses **bold** markers):
 }}
 
 Return JSON only, same shape, every id exactly once, in your chosen order:
-{{"AIEA_BULLETS": [{{"id": "AIEA_BULLETS-2", "text": "..."}}, ...], "MONTESSORI_BULLETS": [...], "PATHWISE_BULLETS": [...], "JOBAGENT_BULLETS": [...]}}"""
+{{"AIEA_BULLETS": [{{"id": "AIEA_BULLETS-2", "text": "..."}}, ...], "MONTESSORI_BULLETS": [...], "UPLINK_BULLETS": [...], "PATHWISE_BULLETS": [...], "JOBAGENT_BULLETS": [...]}}"""

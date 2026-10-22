@@ -18,7 +18,7 @@ def test_template_has_no_tagline_or_headline():
 
 
 def test_template_matches_current_resume_involvements():
-    assert "Alpha Kappa Psi (Historian, Professional Development and Tech Committee), AIEA Lab, Grappling Club}" in TEMPLATE
+    assert "Alpha Kappa Psi (Historian, Professional Development \\& Tech Committee), Grappling Club}" in TEMPLATE
 
 
 def test_every_section_has_its_three_bullets():
@@ -53,7 +53,7 @@ def test_reorder_keeps_resitem_and_bold():
     result, sources, _ = rt.apply_edits(SECTIONS, edits)
     assert result[m] == [SECTIONS[m][2], SECTIONS[m][0], SECTIONS[m][1]]
     tex = rt.render(TEMPLATE, result)
-    assert tex.index("benchmarking framework") < tex.index("CNN image classifier")
+    assert tex.index("benchmarking framework") < tex.index("CIFAR-10")
     body = tex.split("\\begin{document}")[1]
     assert "\\item " not in body.replace("\\resitem", "")   # regression: plain \item caused loose spacing
 
@@ -110,8 +110,8 @@ def test_revert_one_restores_largest_growth_in_place():
     m = "AIEA_BULLETS"
     o0 = rt.latex_to_marked(SECTIONS[m][0])
     o2 = rt.latex_to_marked(SECTIONS[m][2])
-    edits = {m: [{"id": f"{m}-2", "text": o2.replace("Engineered", "Built")},
-                 {"id": f"{m}-0", "text": o0.replace("deployments", "deployment jobs")},
+    edits = {m: [{"id": f"{m}-2", "text": o2.replace("Turned", "Built")},
+                 {"id": f"{m}-0", "text": o0.replace("pods exit", "the pods exit")},
                  {"id": f"{m}-1", "text": rt.latex_to_marked(SECTIONS[m][1])}]}
     result, sources, changes = rt.apply_edits(SECTIONS, edits)
     assert [c["status"] for c in changes] == ["edited", "edited"]
@@ -125,7 +125,7 @@ def test_revert_one_restores_largest_growth_in_place():
 def test_changed_pairs_and_drop_rejected():
     m = "JOBAGENT_BULLETS"
     orig2 = rt.latex_to_marked(SECTIONS[m][2])
-    edited2 = orig2.replace("rich embed alerts", "rich embed telemetry alerts")
+    edited2 = orig2.replace("rejection reasons", "rejection telemetry reasons")
     edits = {m: [{"id": f"{m}-2", "text": edited2},
                  {"id": f"{m}-0", "text": rt.latex_to_marked(SECTIONS[m][0])},
                  {"id": f"{m}-1", "text": rt.latex_to_marked(SECTIONS[m][1])}]}

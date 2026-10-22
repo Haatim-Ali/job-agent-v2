@@ -15,37 +15,51 @@ education:
     coursework:
       - Calculus I-II
       - Linear Algebra
+      - Discrete Mathematics
       - Statistics
-      - Python Programming (CSE 20, CSE 30)
+      - Python Programming
+      - C++ Programming
+      - Computer Programming in C
       - Computer Systems & Assembly Language
     involvements:
-      - Alpha Kappa Psi (Historian, Professional Development and Tech Committee)
-      - AIEA Lab
+      - Alpha Kappa Psi (Historian, Professional Development & Tech Committee)
       - Grappling Club
 
 skills:
-  technical:
+  languages:
     - Python
     - Java
+    - C++
+    - C
     - JavaScript/TypeScript
+    - SQL
     - HTML/CSS
-    - Excel
-    - Next.js
+    - Assembly
+  frameworks_and_tools:
+    - PyTorch
+    - TensorBoard
     - Flask
+    - Next.js
+    - Chart.js
+    - jQuery
+    - Bootstrap
     - Supabase/PostgreSQL
     - Kubernetes
+    - Linux
     - Git
+    - CI
+    - LaTeX
+  ai_ml_and_agents:
     - Claude API
+    - Claude Code
     - NVIDIA NIM
+    - ElevenLabs
+    - AGNTCY/A2A
+    - NATS
+    - Tavily
     - Stable Baselines3
-    - TensorBoard
-    - "AI-assisted development tooling (Claude Code, GPT-4o, Gemini, OpenClaw) used to automate analyses and build tooling"
-  core:
-    - Scenario & what-if modeling
-    - Reward-curve / hyperparameter analysis
-    - Root-cause debugging
-    - Curriculum & instructional design
-    - Data-driven pipeline design
+    - Reinforcement Learning
+    - CNNs
   soft:
     - Written & presentation communication
     - Team leadership
@@ -56,12 +70,13 @@ experience:
     location: Santa Cruz, CA
     dates: May 2026 - Present
     bullets:
-      - "Trained a CNN image classifier via GPU-backed Kubernetes deployments (Nautilus), managing PVCs, Deployments, and Jobs to eliminate idle GPU-node costs"
-      - "Implemented and benchmarked 5 RL algorithms (PPO, DQN, SAC, DDPG, Stable Baselines3 baseline) against the CarRacing-v2 continuous-control environment, logging reward/loss convergence via TensorBoard"
-      - "Engineered a single-file benchmarking framework automating training, hyperparameter sweeps, and reward-curve generation across 3+ RL algorithms in parallel"
+      - "Containerized PyTorch CNN training on CIFAR-10 as GPU-backed Kubernetes Jobs on the Nautilus cluster, persisting results to PVCs so pods exit after training, eliminating idle GPU-node costs"
+      - "Moved from classification to control, benchmarking 5 RL algorithms (PPO, DQN, SAC, DDPG, SB3 baseline) on CarRacing-v2 and comparing reward/loss convergence in TensorBoard"
+      - "Turned those one-off runs into a single-file benchmarking framework that automates training, hyperparameter sweeps, and reward-curve generation for 3+ algorithms in parallel"
     key_metrics:
       - "5 RL algorithms implemented and benchmarked"
       - "3+ RL algorithms benchmarked in parallel via a custom framework"
+      - "Idle GPU-node costs eliminated by running training as Kubernetes Jobs"
     narrative: "Direct hands-on research experience with ML training pipelines, GPU infrastructure, and RL -- the strongest evidence of applied AI/ML capability."
 
   - title: Website Developer
@@ -70,12 +85,12 @@ experience:
     dates: June 2022 - Present
     bullets:
       - "Founded and led a 3-person team to build a school website from scratch, now driving 150+ parent enrollments over 3 years"
-      - "Root-caused a production outage across 6 of 8 live pages to a legacy CMS stripping script tags, restoring jQuery/Bootstrap functionality site-wide"
-      - "Re-architected inline-styled markup into a modular per-page CSS system across 8 pages, removing 18+ dead style rules with zero visual regressions"
+      - "Kept it live by tracing an outage on 6 of 8 pages to a legacy CMS stripping script tags and restoring jQuery/Bootstrap"
+      - "Then refactored inline styles into a modular per-page CSS system, cutting 18+ dead rules with zero visual regressions"
     key_metrics:
       - "150+ parent enrollments driven over 3 years"
       - "Restored functionality across 6 of 8 production pages after root-causing a CMS outage"
-      - "Removed 18+ dead CSS rules across 8 pages with zero regressions"
+      - "Removed 18+ dead CSS rules with zero regressions"
     narrative: "Longest-running project -- founded and led the team behind a production website, with hands-on ownership of outages and technical debt cleanup, long before the AI/ML focus."
 
   - title: Python Programming Camp Instructor
@@ -83,33 +98,47 @@ experience:
     location: Milpitas, CA
     dates: Summers 2022 - 2025
     bullets:
-      - "Directed a 4-week Python fundamentals camp (syntax, control flow, functions, debugging) for 30+ students ages 6-12, achieving a 100% project completion and live-demo rate"
-      - "Designed a 20+ lesson curriculum sequencing core CS concepts into age-appropriate, project-based exercises, adopted as the school's standard summer CS program across 4 consecutive years"
-      - "Recruited, trained, and managed 2 volunteer teaching assistants, delegating lesson support and 1:1 debugging help across 6+ hours of daily instruction"
+      - "Designed a 20+ lesson, 4-week Python curriculum teaching syntax, control flow, functions, and debugging through projects"
+      - "Recruited, trained, and managed 2 volunteer TAs to give 1:1 debugging help across 6+ hours of daily instruction"
+      - "Taught 30+ students ages 6-12 to a 100% project completion and live-demo rate, leading the school to adopt the curriculum as its standard summer CS program for 4 straight years"
     key_metrics:
       - "30+ students taught per camp, ages 6-12"
       - "100% project completion and live-demo rate"
-      - "Curriculum adopted as the standard program across 4 consecutive years"
+      - "Curriculum adopted as the standard program for 4 consecutive years"
     narrative: "Teaching experience showing curriculum design and mentorship ability -- a second, teaching-focused angle at the same organization as the website work."
 
 projects:
+  - name: Uplink -- Multi-Agent Food Rescue Negotiation
+    context: "UCSC AI Hackathon 2026, Cisco \"When AI Agents Disagree\" track (team of 3)"
+    dates: October 2026
+    link: github.com/saraxjain/uplink
+    bullets:
+      - "Co-built a food-rescue system where donations arrive by Claude photo counting or ElevenLabs voice, then 3 Claude agents with competing goals (speed, cost, need) propose, vote, and veto each delivery"
+      - "Distributed it into 16 independent agent processes on Cisco's AGNTCY A2A protocol over NATS with an agent directory and heartbeats, matching in-process decisions with 0 failed messages"
+      - "On 100 held-out scenarios, cut food lost by 93% vs. a nearest-shelter baseline and 67% vs. the best single agent, with photo counts within 10% on 33 of 34 test reads"
+    key_metrics:
+      - "93% less food lost than a nearest-shelter baseline, 67% less than the best single agent (100 held-out scenarios)"
+      - "16 agent processes over A2A/NATS with 0 failed messages"
+      - "Photo counts within 10% on 33 of 34 test reads"
+    narrative: "Team hackathon project; a teammate started the negotiation and Haatim built the distributed A2A runtime, the evaluation, the photo-accuracy work, and extensions to the agents. Say co-built, not designed."
+
   - name: Pathwise -- Autonomous Planning Agent
     context: "Hack-a-Claw 2026, 24-hour NVIDIA hackathon at UCSC Baskin Engineering (team of 3)"
     dates: May 2026
     link: github.com/Haatim-Ali/pathwise
     bullets:
-      - "Built an autonomous agent system converting unstructured, plain-English user input into a structured, month-by-month action plan -- combining live external data retrieval (Tavily API), multi-step reasoning on NVIDIA Nemotron 49B via NIM, persistent memory, and what-if scenario modeling"
-      - "Designed the agent's reasoning pipeline to reconcile multiple live data sources and competing constraints into a single coherent recommendation, applied to the domain of personal financial planning (debt schedules, savings rates, market data)"
-      - "Shipped a working Flask + Chart.js full-stack demo visualizing payoff timelines, surplus allocation, and net worth trajectory within the 24-hour window, submitted to the Cloud and Best for UCSC prize tracks"
+      - "Built an agent turning plain-English finances into a month-by-month plan, reasoning with NVIDIA Nemotron 49B via NIM"
+      - "Grounded plans in live HYSA, mortgage, and S&P 500 rates via the Tavily API, with persistent memory and what-if scenarios that re-plan on demand"
+      - "Shipped a Flask + Chart.js full-stack demo of payoff timelines, surplus allocation, and net worth trajectory within 24 hours, submitted to the Cloud and Best for UCSC tracks"
 
-  - name: JobAgent -- AI-Powered Job Search Automation
-    context: "Personal project, co-developed with 1 collaborator"
+  - name: JobAgent -- Autonomous Internship Search & Tailoring Pipeline
+    context: "Personal project, built out from a 2-person prototype"
     dates: March 2026 - Present
-    link: github.com/Haatim-Ali/job-agent
+    link: github.com/Haatim-Ali/job-agent-v2
     bullets:
-      - "Led the AI/ML pipeline design, integrating a two-tier Claude API architecture -- Haiku-4-5 for high-volume job relevance filtering, Sonnet-4-6 for conversational cover letter generation, interview prep, and role analysis"
-      - "Built a Python scraping service (JobSpy, BeautifulSoup) polling LinkedIn every 30 minutes, feeding a Supabase-backed pipeline that tracks applications through a 6-stage Kanban workflow (New -> Saved -> Applied -> Interviewing -> Offer -> Rejected)"
-      - "Engineered a Discord bot (discord.py) delivering rich embed alerts with AI-generated fit scores, applicant counts, and posting freshness, with emoji-reaction shortcuts driving downstream pipeline actions"
+      - "Runs 24/7 on a Debian VPS, pulling LinkedIn and 7 job-board APIs every 30 min; a cost-ordered filter funnel screened 49,000+ postings down to 522 Claude Haiku-scored alerts"
+      - "Each alert gets a LaTeX resume and cover letter tailored by Claude Sonnet, guarded by an independent fact-check pass that rejects any added skill, metric, or claim"
+      - "Kept it dependable with 195 automated tests, CI, and a deploy script that auto-rolls back on failure; a Discord bot feeds my rejection reasons back into scoring"
 
 interests:
   - Weightlifting
@@ -122,6 +151,6 @@ cover_letter_style:
   strengths:
     - Direct, story-led -- leads with a concrete problem before the pitch
     - Technically literate without corporate fluff
-  key_narrative: "Hands-on builder -- from AIEA Lab's RL research to Pathwise's 24-hour hackathon build -- who ships working systems, not just coursework."
+  key_narrative: "Hands-on builder -- from AIEA Lab's RL research to Uplink's multi-agent system and Pathwise's 24-hour hackathon build -- who ships working systems, not just coursework."
   voice: "Direct, enthusiastic, technically literate but people-first. No corporate speak, no em dashes."
   one_page: true
