@@ -17,8 +17,14 @@ def test_template_has_no_tagline_or_headline():
     assert "TAGLINE" not in TEMPLATE
 
 
-def test_template_matches_current_resume_involvements():
-    assert "Alpha Kappa Psi (Historian, Professional Development \\& Tech Committee), Grappling Club}" in TEMPLATE
+def test_template_matches_current_resume_v4():
+    assert "Undergraduate Research Assistant, AI Explainability and Accountability Lab" in TEMPLATE
+    assert "Campus Involvements" not in TEMPLATE
+    assert "saraxjain/uplink" not in TEMPLATE
+
+
+def test_template_bullets_have_no_bold():
+    assert all("\\textbf" not in b for bullets in SECTIONS.values() for b in bullets)
 
 
 def test_every_section_has_its_three_bullets():
@@ -91,6 +97,10 @@ class TestValidateEdit:
     def test_unbalanced_bold_rejected(self):
         assert "unbalanced" in rt.validate_edit(self.orig, self.orig.replace("**CNN", "CNN", 1))
 
+    def test_bold_added_to_unbolded_bullet_rejected(self):
+        o = "Benchmarked 5 RL algorithms on CarRacing-v2"
+        assert "bold" in rt.validate_edit(o, "Benchmarked **5** RL algorithms on CarRacing-v2")
+
     def test_new_em_dash_rejected(self):
         new = self.orig.replace(" managing", " — managing")
         assert rt.validate_edit(self.orig, new) is not None
@@ -110,8 +120,8 @@ def test_revert_one_restores_largest_growth_in_place():
     m = "AIEA_BULLETS"
     o0 = rt.latex_to_marked(SECTIONS[m][0])
     o2 = rt.latex_to_marked(SECTIONS[m][2])
-    edits = {m: [{"id": f"{m}-2", "text": o2.replace("Turned", "Built")},
-                 {"id": f"{m}-0", "text": o0.replace("pods exit", "the pods exit")},
+    edits = {m: [{"id": f"{m}-2", "text": o2.replace("Developed", "Built a")},
+                 {"id": f"{m}-0", "text": o0.replace("pods released", "the pods released")},
                  {"id": f"{m}-1", "text": rt.latex_to_marked(SECTIONS[m][1])}]}
     result, sources, changes = rt.apply_edits(SECTIONS, edits)
     assert [c["status"] for c in changes] == ["edited", "edited"]

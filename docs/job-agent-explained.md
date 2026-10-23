@@ -512,7 +512,7 @@ Pending state lives in two Python dictionaries in memory, `pending_requests` and
 
 ### A short LaTeX primer
 
-**LaTeX** is a typesetting language: you write plain text with commands, and a compiler lays it out into a PDF with professional typography. `ResumeTemplate.tex` **is** your resume. Since 2026-10-22 it compiles line for line to `Haatim_Ali_Resume_v3.pdf` (the general software/AI-ML resume, also used on Overleaf). It loads the TeX Gyre Termes font (`tgtermes`) and falls back to Times if that isn't installed. If you update your own resume, update the template to match (and vice versa), and update `experience_kb.yaml`, which holds the same facts for cover letters and the fact-check.
+**LaTeX** is a typesetting language: you write plain text with commands, and a compiler lays it out into a PDF with professional typography. `ResumeTemplate.tex` **is** your resume. Since 2026-10-23 it compiles line for line to `Haatim_Ali_Resume_v4.pdf` (the general software/AI-ML resume, also used on Overleaf). It loads the TeX Gyre Termes font (`tgtermes`) and falls back to Times if that isn't installed. If you update your own resume, update the template to match (and vice versa), and update `experience_kb.yaml`, which holds the same facts for cover letters and the fact-check.
 
 - The **preamble** (everything before `\begin{document}`) loads packages (`times` for the Times font, `hyperref` for clickable links) and sets margins.
 - **Macros** are reusable commands the template defines. For example, `\newcommand{\resitem}[1]{\item #1 \vspace{-6pt}}` defines `\resitem{...}` as "a bullet, then pull the next line up 6 points." That negative space is what makes your resume tight; bullets inserted as a plain `\item` look loose (a past bug).
@@ -536,16 +536,16 @@ Pending state lives in two Python dictionaries in memory, `pending_requests` and
 
 ### How resume edits are kept truthful
 
-Only the 15 bullets in five sections can change: AIEA Lab (3), Website Developer (3), Uplink (3), Pathwise (3), JobAgent (3). The header, education, camp-instructor bullets and "Additional" section are never touched.
+Only the 15 bullets in five sections can change: AIEA Lab (3), Website Developer (3), Uplink (3), Pathwise (3), JobAgent (3). The header, education, camp-instructor bullets and "Technical Skills" section are never touched.
 
 1. **Extract.** `extract_sections` finds each marker block and pulls out the argument of every `\resitem{...}`, counting braces so nested ones like `\textbf{...}` don't end it early (a **brace-balanced parse**).
 2. **Convert to editable text.** `latex_to_marked` turns `\textbf{Kubernetes}` into `**Kubernetes**` and unescapes symbols, so Claude sees clean text with Markdown-style bold. Each bullet gets an ID like `AIEA_BULLETS-0`.
-3. **Ask for edits.** The prompt (`build_prompt`) gives the analysis, the job description and the bullets, and allows exactly three kinds of change: reorder bullets within a section, reword toward the job's terminology where it's true (aiming for 4 to 7 of the 12), and move bold onto job-relevant terms. The reply is JSON in the same shape, every ID exactly once.
+3. **Ask for edits.** The prompt (`build_prompt`) gives the analysis, the job description and the bullets, and allows exactly three kinds of change: reorder bullets within a section, reword toward the job's terminology where it's true (aiming for 5 to 9 of the 15), and keep bold as it is (v4 bullets have no bold, so none may be added; where a bullet has bold, it may move onto a job-relevant term). The reply is JSON in the same shape, every ID exactly once.
 4. **Mechanical validation** (`validate_edit`), in code. An edit is rejected, and the original kept, if it:
    - is empty, or has unbalanced `**` markers
    - is more than 5% plus 6 characters longer (`MAX_GROWTH = 1.05`, `GROWTH_SLACK = 6`), or under 70% of the original length (`MIN_SHRINK = 0.70`)
    - drops any number from the original, or introduces a new one (found with the regex `\d+(?:\.\d+)?\+?%?`, which matches 5, 3+, 100%, 49.5)
-   - removes all bold, or adds more than one extra bold span
+   - removes all bold, adds more than one extra bold span, or adds any bold to a bullet that had none
    - adds an em dash (—) the original didn't have
 5. **Order check.** A reorder is accepted only if the new ID list is a **permutation** of the old one (same IDs, just rearranged). Anything else keeps the original order.
 6. **Independent fact-check** (`build_verify_prompt`). A second Sonnet call at temperature 0 sees only ORIGINAL and EDITED pairs and acts as a strict judge. It rejects relabeling ("Discord alerts" → "telemetry"), new tools or outcomes, and stronger claims ("led" for "helped", "production" for "demo"). Real catches: calling Pathwise's "reasoning pipeline" a "data pipeline," and adding "cross-functional" to a Montessori bullet. **If the check itself fails to run, every edit is discarded**: the safe failure is your original wording.
@@ -995,6 +995,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-23: v4 base resume.** `ResumeTemplate.tex` now matches Haatim's v4 resume, revised after a resume reviewer's feedback: centered header without a city, "Class of 2028" and the degree spelled out, Campus Involvements removed, "Role, Company" on one line with no cities, the AIEA Lab's full name (AI Explainability and Accountability), camp dates as months, no bold in any bullet, standalone past-tense bullets, Uplink rewritten around Haatim's own part (A2A runtime, photo-accuracy work, evaluation) with the teammate's repo link removed, and "Additional" replaced by a bullet-free Technical Skills section (Languages, Frameworks & Tools, Concepts). `resume_tailor.py` now rejects any bold added to an unbolded bullet and tells Claude not to add bold. `experience_kb.yaml` bullets, titles and dates synced (interests and involvements kept there as cover-letter facts). 2 tests added.
 
 **2026-10-22: new base resume.** `ResumeTemplate.tex` and `experience_kb.yaml` now match Haatim's v3 resume: Fremont header, updated coursework, Uplink added as a fifth tailorable section (`UPLINK_BULLETS`), reworded bullets, regrouped skills (Languages, Frameworks & Tools, AI/ML & Agents). Tests updated for the new wording. The KB's skills are now grouped the same way instead of technical/core.
 

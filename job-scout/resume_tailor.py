@@ -6,7 +6,7 @@ applies small, validated edits to the bullets inside the %%X_START%% / %%X_END%%
 
   * reorder bullets within a section (most relevant first)
   * reword a bullet toward the job's language, keeping every fact and number
-  * move bold emphasis onto job-relevant terms already in the bullet
+  * move existing bold emphasis onto job-relevant terms (never add bold to an unbolded bullet)
 
 Every edit is checked in code. An edit that drops a number, grows the bullet, adds or
 removes a bullet, or breaks bold markup is rejected and the original bullet is kept.
@@ -131,7 +131,7 @@ def validate_edit(original, edited):
     bold_o, bold_e = original.count("**") // 2, edited.count("**") // 2
     if bold_o and not bold_e:
         return "removed all bold emphasis"
-    if bold_e > bold_o + 1:
+    if bold_e > bold_o + 1 or (bold_e and not bold_o):
         return "too much bold"
     if "\u2014" in e and "\u2014" not in o:
         return "added an em dash"
@@ -269,13 +269,13 @@ Your ONLY allowed changes, per section:
 1. Reorder bullets so the most relevant to this job comes first.
 2. Reword bullets to use the job's terminology wherever it TRUTHFULLY describes what the bullet
    already says, so a recruiter or ATS scanning for this job's keywords finds them. Aim to reword
-   4 to 7 of the 12 bullets, prioritising the ones most relevant to the job; leave the rest exactly
+   5 to 9 of the 15 bullets, prioritising the ones most relevant to the job; leave the rest exactly
    as they are. Good edits swap a generic word for the job's precise term, or lead with the part of
    the bullet this job cares about most (e.g. for an infrastructure role, lead with the GPU /
    Kubernetes orchestration; for an ML role, lead with the model and training).
    Bad edits claim anything the bullet doesn't already say.
-3. Move **bold** onto the most job-relevant term or number already in the bullet
-   (keep roughly the same number of bold spans as the original).
+3. Keep bold as it is: a bullet with no **bold** must stay without bold; where a bullet has
+   bold, you may move it onto the most job-relevant term or number already in the bullet.
 
 Think about which of the candidate's real strengths this job values most, and make sure those
 bullets come first in their section and read in the job's language.
