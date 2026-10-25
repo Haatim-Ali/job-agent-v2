@@ -68,7 +68,7 @@ def test_reorder_keeps_resitem_and_bold():
     result, sources, _ = rt.apply_edits(SECTIONS, edits)
     assert result[m] == [SECTIONS[m][2], SECTIONS[m][0], SECTIONS[m][1]]
     tex = rt.render(TEMPLATE, result)
-    assert tex.index("benchmarking framework") < tex.index("CIFAR-10")
+    assert tex.index("head-to-head") < tex.index("CIFAR-10")
     body = tex.split("\\begin{document}")[1]
     assert "\\item " not in body.replace("\\resitem", "")   # regression: plain \item caused loose spacing
 
@@ -129,8 +129,8 @@ def test_revert_one_restores_largest_growth_in_place():
     m = "AIEA_BULLETS"
     o0 = rt.latex_to_marked(SECTIONS[m][0])
     o2 = rt.latex_to_marked(SECTIONS[m][2])
-    edits = {m: [{"id": f"{m}-2", "text": o2.replace("Engineered", "Built")},
-                 {"id": f"{m}-0", "text": o0.replace("pods freed", "the pods freed")},
+    edits = {m: [{"id": f"{m}-2", "text": o2.replace("Produced head-to-head", "Produced")},
+                 {"id": f"{m}-0", "text": o0.replace("idle GPU-node costs", "all idle GPU-node costs")},
                  {"id": f"{m}-1", "text": rt.latex_to_marked(SECTIONS[m][1])}]}
     result, sources, changes = rt.apply_edits(SECTIONS, edits)
     assert [c["status"] for c in changes] == ["edited", "edited"]

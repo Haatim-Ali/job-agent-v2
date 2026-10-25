@@ -512,7 +512,7 @@ Pending state lives in two Python dictionaries in memory, `pending_requests` and
 
 ### A short LaTeX primer
 
-**LaTeX** is a typesetting language: you write plain text with commands, and a compiler lays it out into a PDF with professional typography. `ResumeTemplate.tex` **is** your resume. Since 2026-10-25 it compiles line for line to `Haatim_Ali_Resume_v6.pdf` (the general software/AI-ML resume, also used on Overleaf). It loads the TeX Gyre Termes font (`tgtermes`) and falls back to Times if that isn't installed. If you update your own resume, update the template to match (and vice versa), and update `experience_kb.yaml`, which holds the same facts for cover letters and the fact-check.
+**LaTeX** is a typesetting language: you write plain text with commands, and a compiler lays it out into a PDF with professional typography. `ResumeTemplate.tex` **is** your resume. Since 2026-10-25 it compiles line for line to `Haatim_Ali_Resume_v7.pdf` (the general software/AI-ML resume, also used on Overleaf). It loads the TeX Gyre Termes font (`tgtermes`) and falls back to Times if that isn't installed. If you update your own resume, update the template to match (and vice versa), and update `experience_kb.yaml`, which holds the same facts for cover letters and the fact-check.
 
 - The **preamble** (everything before `\begin{document}`) loads packages (`times` for the Times font, `hyperref` for clickable links) and sets margins.
 - **Macros** are reusable commands the template defines. For example, `\newcommand{\resitem}[1]{\item #1 \vspace{-6pt}}` defines `\resitem{...}` as "a bullet, then pull the next line up 6 points." That negative space is what makes your resume tight; bullets inserted as a plain `\item` look loose (a past bug).
@@ -995,6 +995,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-25: v7 base resume.** Every bullet rewritten result-first (outcome, then "by ..." how), after comparing with a friend's resume that did better in recruiting. Camp cut to 2 bullets; a Leadership line (Alpha Kappa Psi Historian) added under Education. The tailor prompt now tells Claude to keep the outcome at the start of each bullet.
 
 **2026-10-25: v6 base resume.** v5 plus more of the resume reviewer's feedback: centered header, no bold in bullets, Campus Involvements and Interests removed, camp adoption clause cut; a fourth bullet each for JobAgent (JS-heavy career sites read via job APIs and Playwright) and Uplink (photo accuracy, ElevenLabs retries) to fill the page. Fixed a v5 bug: `\DisableLigatures` with no option also disabled `--`, `---` and quote ligatures, so pdfLaTeX printed them literally; it's now `\DisableLigatures[f]`. The tailor prompt no longer hardcodes a bullet count.
 

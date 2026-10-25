@@ -288,7 +288,8 @@ Hard rules (edits that break these are automatically discarded):
 - Same length or shorter: never more than 5% longer than the original bullet.
 - Keep every bullet: same ids, no additions, no deletions, no merging.
 - No em dashes unless the original bullet already has one. Keep **bold** markers balanced.
-- Match the existing style: past-tense action verb first, no period at the end.
+- Match the existing style: past-tense action verb first, no period at the end. Bullets are
+  result-first (outcome, then "by ..." how); keep the outcome at the start of the bullet.
 
 Current bullets (text uses **bold** markers):
 {{
