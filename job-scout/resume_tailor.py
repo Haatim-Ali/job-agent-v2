@@ -165,6 +165,8 @@ def apply_edits(sections, edits):
         for bid in order:
             idx = ids.index(bid)
             new = texts.get(bid)
+            if isinstance(new, str) and "**" not in marked[idx]:
+                new = plain(new)   # bullets without bold stay without bold; keep the rewording
             if new is None or new == marked[idx]:
                 out.append(originals[idx])
                 continue

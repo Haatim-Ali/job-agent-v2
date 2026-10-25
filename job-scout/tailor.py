@@ -271,12 +271,55 @@ P3: {cl.get('paragraph_3', '')}""", COVER_SCHEMA, max_tokens=16000, effort=EFFOR
 
 # ── Job description fetcher ────────────────────────────────────────────────────
 
+def looks_like_prose(text):
+    """True if text reads like a job posting, not page config/JSON/CSS that a JS-only site
+    returns to a plain fetch (jobs.nvidia.com's body is its theme JSON, which used to be
+    tailored against as if it were the JD)."""
+    if not text or len(text) < 200:
+        return False
+    head = text.lstrip()[:1]
+    if head in "{[<":
+        return False
+    words = re.findall(r"[A-Za-z]{2,}", text[:3000])
+    junk = sum(text[:3000].count(c) for c in '{}":#;')
+    return len(words) >= 60 and junk < len(words)
+
+
+def fetch_eightfold_description(url, headers):
+    """Eightfold career sites (jobs.nvidia.com and others) are JS apps whose links carry the
+    posting id as ?pid=. Their public job API returns the real title and description."""
+    from urllib.parse import urlparse, parse_qs
+    u = urlparse(url)
+    qs = parse_qs(u.query)
+    pid = (qs.get("pid") or [None])[0]
+    if not pid or not pid.isdigit():
+        return None
+    host = u.netloc.lower()
+    domain = (qs.get("domain") or [None])[0] or re.sub(r"^(jobs|careers|apply)\.", "", host)
+    try:
+        resp = requests.get(f"{u.scheme or 'https'}://{host}/api/apply/v2/jobs/{pid}",
+                            params={"domain": domain}, headers=headers, timeout=15)
+        data = resp.json() if resp.ok else {}
+    except Exception as e:
+        logging.info(f"Eightfold API failed for {url}: {e}")
+        return None
+    desc = data.get("job_description") or ""
+    if not desc:
+        return None
+    body = BeautifulSoup(desc, "html.parser").get_text(separator="\n", strip=True)
+    header = "\n".join(x for x in (data.get("name"), data.get("location")) if x)
+    return f"{header}\n\n{body}"[:8000]
+
+
 def fetch_job_description(url):
     headers = {"User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
         "Chrome/120.0.0.0 Safari/537.36"
     )}
+    eightfold = fetch_eightfold_description(url, headers)
+    if eightfold:
+        return eightfold
     try:
         resp = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(resp.text, "html.parser")
@@ -287,11 +330,13 @@ def fetch_job_description(url):
             "article", ".content",
         ]:
             el = soup.select_one(selector)
-            if el and len(el.get_text(strip=True)) > 200:
+            if el and looks_like_prose(el.get_text(separator="\n", strip=True)):
                 return el.get_text(separator="\n", strip=True)
+        for junk in soup(["script", "style", "noscript"]):
+            junk.decompose()
         body = soup.find("body")
         text = body.get_text(separator="\n", strip=True) if body else resp.text
-        if len(text) > 200:
+        if looks_like_prose(text):
             return text[:6000]
     except Exception as e:
         logging.error(f"Failed to fetch JD from {url}: {e}")
@@ -322,7 +367,10 @@ def fetch_job_description_browser(url):
             page.wait_for_timeout(5000)
             text = page.inner_text("body")
             browser.close()
-            return text[:6000] if text and len(text) > 200 else None
+            if looks_like_prose(text):
+                return text[:6000]
+            logging.warning(f"No readable job description at {url}")
+            return None
     except Exception as e:
         logging.error(f"Headless browser fetch failed for {url}: {e}")
         return None

@@ -158,3 +158,12 @@ def test_gaps_go_in_a_text_file_not_chat():
     name, data = tailor.gaps_attachment("Scale AI", "SWE Intern", "GAPS TO PREPARE FOR:\n1. Go")
     assert name == "Haatim_Ali_Scale_AI_Interview_Prep.txt"
     assert data.decode().startswith("SWE Intern @ Scale AI") and "1. Go" in data.decode()
+
+
+def test_bold_added_to_unbolded_bullet_is_stripped_not_rejected():
+    m = "AIEA_BULLETS"
+    o1 = rt.latex_to_marked(SECTIONS[m][1])
+    new = o1.replace("Benchmarked 5", "Benchmarked **5**")
+    edits = {m: [{"id": f"{m}-{i}", "text": new if i == 1 else rt.latex_to_marked(SECTIONS[m][i])} for i in range(3)]}
+    result, _, changes = rt.apply_edits(SECTIONS, edits)
+    assert result[m][1] == SECTIONS[m][1] and not changes   # bold dropped, nothing else changed

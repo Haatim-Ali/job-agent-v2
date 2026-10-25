@@ -524,7 +524,7 @@ Pending state lives in two Python dictionaries in memory, `pending_requests` and
 
 `tailor.tailor(job_url, job_description)` runs these steps. Every Claude call here uses the **draft model**, `DRAFT_MODEL` in `claude_json.py`: **Claude Sonnet 5.5** (`claude-sonnet-5-5`) since 2026-10-01, previously Sonnet 4.6 (see "Choosing the draft model" in Part 8). Passes 2 and 3 get your knowledge base as a cached system block.
 
-1. **Get the job description.** Passed in by `apply_prep.py`, or fetched: a plain HTTP request trying selectors such as `.job-description`, and if the page comes back nearly empty (sites behind a JavaScript bot check), a **headless browser** (Playwright running Chromium with no window) loads it and waits 5 seconds.
+1. **Get the job description.** Passed in by `apply_prep.py`, or fetched: a plain HTTP request trying selectors such as `.job-description`, and if the page comes back nearly empty (sites behind a JavaScript bot check), a **headless browser** (Playwright running Chromium with no window) loads it and waits 5 seconds. Eightfold career sites (jobs.nvidia.com and other links with `?pid=`) are read through their public job API instead (`/api/apply/v2/jobs/<pid>`), which returns the real title, location and description. Whatever comes back must pass `looks_like_prose` (real sentences, not JSON or CSS); if nothing does, the bot replies that it couldn't read the posting instead of tailoring against junk.
 2. **Pass 1: analyze the job** (Sonnet). Returns JSON: exact role title, company, a filename slug, 3 to 5 must-haves, 2 to 3 nice-to-haves, 12 to 15 ATS keywords, and the tone (formal, startup, technical, sales).
 3. **Pass 2: match experience** (Sonnet). Compares `experience_kb.yaml` with the must-haves; returns which experience should lead, one story for the cover letter, and **gaps** (requirements you don't clearly meet) with a talking point for each.
 4. **Pass 3: write the cover letter** (Sonnet). Three paragraphs, only real experience, no em dashes, a logistics line at the end.
@@ -545,7 +545,7 @@ Only the 15 bullets in five sections can change: AIEA Lab (3), Website Developer
    - is empty, or has unbalanced `**` markers
    - is more than 5% plus 6 characters longer (`MAX_GROWTH = 1.05`, `GROWTH_SLACK = 6`), or under 70% of the original length (`MIN_SHRINK = 0.70`)
    - drops any number from the original, or introduces a new one (found with the regex `\d+(?:\.\d+)?\+?%?`, which matches 5, 3+, 100%, 49.5)
-   - removes all bold, adds more than one extra bold span, or adds any bold to a bullet that had none
+   - removes all bold or adds more than one extra bold span (bold added to a bullet that had none is simply stripped, keeping the rewording)
    - adds an em dash (—) the original didn't have
 5. **Order check.** A reorder is accepted only if the new ID list is a **permutation** of the old one (same IDs, just rearranged). Anything else keeps the original order.
 6. **Independent fact-check** (`build_verify_prompt`). A second Sonnet call at temperature 0 sees only ORIGINAL and EDITED pairs and acts as a strict judge. It rejects relabeling ("Discord alerts" → "telemetry"), new tools or outcomes, and stronger claims ("led" for "helped", "production" for "demo"). Real catches: calling Pathwise's "reasoning pipeline" a "data pipeline," and adding "cross-functional" to a Montessori bullet. **If the check itself fails to run, every edit is discarded**: the safe failure is your original wording.
@@ -995,6 +995,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-25: NVIDIA links tailored against the wrong text.** jobs.nvidia.com is a JavaScript app, so the plain fetch got its theme JSON (over 200 characters, so accepted as the "job description"). Two different NVIDIA roles (a world-models research intern and a technical marketing intern) produced byte-identical resumes. Fix: Eightfold job API for `?pid=` links, a `looks_like_prose` check on every fetch path, scripts/styles stripped before reading the page body. Also, Claude kept adding bold to v4's unbolded bullets, so whole rewordings were rejected as "too much bold" and resumes came out barely tailored; the bold is now stripped and the rewording kept. 5 tests added.
 
 **2026-10-25: CI green again.** GitHub Actions had failed on every push since early October: `test_draft_answers_sends_schema_and_cached_kb` read the personal `application_answers.yaml`, which isn't in git, so it only passed on the Mac and VPS. The test now uses `application_answers.yaml.example`.
 
