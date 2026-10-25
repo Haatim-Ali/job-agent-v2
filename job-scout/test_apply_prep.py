@@ -357,6 +357,8 @@ def test_answer_schema_pins_keys_and_options():
 
 
 def test_draft_answers_sends_schema_and_cached_kb(tmp_path, monkeypatch):
+    # application_answers.yaml is personal and not in git, so CI only has the example
+    monkeypatch.setattr(ap, "ANSWERS_PATH", ap.ANSWERS_PATH + ".example")
     sent = {}
 
     class Messages:
