@@ -123,7 +123,7 @@ projects:
     link: github.com/Haatim-Ali/uplink  # Haatim's fork of the team repo (saraxjain/uplink)
     bullets:
       - "Re-architected a 3-agent Claude negotiation (speed, cost, need) into 16 independent processes on Cisco's AGNTCY A2A protocol over NATS, with an agent directory, heartbeats, and 0 failed messages"
-      - "Improved Claude photo counting of donations to within 10% on 33 of 34 test reads by re-reading only low-confidence photos, and added a fallback that keeps ElevenLabs voice intake working"
+      - "Improved Claude photo counting of donations to within 10% on 33 of 34 test reads by re-reading only low-confidence photos, and added retries so no ElevenLabs voice line dropped"
       - "Built the team-vs-solo evaluation across 100 held-out scenarios, showing the multi-agent design cut food lost by 67% versus the best single agent and 93% versus a nearest-shelter baseline"
     key_metrics:
       - "93% less food lost than a nearest-shelter baseline, 67% less than the best single agent (100 held-out scenarios)"
@@ -147,7 +147,7 @@ projects:
     bullets:
       - "Deployed a 24/7 pipeline on a Debian VPS that pulls LinkedIn and 7 job-board APIs every 30 min, screening 49,000+ postings down to 522 Claude Haiku-scored alerts"
       - "Automated a LaTeX resume and cover letter tailored by Claude Sonnet for every alert, guarded by an independent fact-check that rejects any added skill, metric, or claim"
-      - "Ensured reliability with 195 automated tests, CI, and a deploy script that auto-rolls back on failure, plus a Discord bot that feeds rejection reasons back into scoring"
+      - "Ensured reliability with 200+ automated tests, CI, and a deploy script that auto-rolls back on failure, plus a Discord bot that feeds rejection reasons back into scoring"
 
 interests:
   - Weightlifting

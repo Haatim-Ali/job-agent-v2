@@ -996,6 +996,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 
 # Changelog
 
+**2026-10-25: v4 layout update.** Education is now one line like the jobs ("Bachelor of Science in Computer Science, University of California, Santa Cruz" with "Expected March 2028" on the right, since many postings filter on graduation month). Job entries show the city again next to the dates. Uplink's ElevenLabs claim now matches merged work (retries under the rate limit; the browser-transcript fallback is in an unmerged PR). Test count says 200+.
+
 **2026-10-25: NVIDIA links tailored against the wrong text.** jobs.nvidia.com is a JavaScript app, so the plain fetch got its theme JSON (over 200 characters, so accepted as the "job description"). Two different NVIDIA roles (a world-models research intern and a technical marketing intern) produced byte-identical resumes. Fix: Eightfold job API for `?pid=` links, a `looks_like_prose` check on every fetch path, scripts/styles stripped before reading the page body. Also, Claude kept adding bold to v4's unbolded bullets, so whole rewordings were rejected as "too much bold" and resumes came out barely tailored; the bold is now stripped and the rewording kept. 5 tests added.
 
 **2026-10-25: CI green again.** GitHub Actions had failed on every push since early October: `test_draft_answers_sends_schema_and_cached_kb` read the personal `application_answers.yaml`, which isn't in git, so it only passed on the Mac and VPS. The test now uses `application_answers.yaml.example`.
