@@ -17,12 +17,12 @@
 \usepackage{tocloft}
 \usepackage{array}
 \usepackage[hidelinks]{hyperref}
-% ATS: make the PDF's text copy/paste and parse as plain words (fi, ff, -- stay real letters)
+% ATS: make the PDF's text copy/paste and parse as plain words (fi/ff/fl stay separate letters)
 \ifdefined\pdfgentounicode
   \input{glyphtounicode}
   \pdfgentounicode=1
   \usepackage{microtype}
-  \DisableLigatures{encoding = *, family = *}
+  \DisableLigatures[f]{encoding = *, family = *}
 \fi
 \hypersetup{pdftitle={Haatim Ali Resume}, pdfauthor={Haatim Ali},
   pdfsubject={Software Engineering and AI/ML Internship Resume}}
@@ -66,11 +66,11 @@
 
 \begin{document}
 
-\begin{tabular*}{7in}{l@{\extracolsep{\fill}}r}
-\textbf{\huge Haatim Ali} & haatimta@gmail.com $\cdot$ (510) 468-7997 \\
-Fremont, CA & \href{https://www.linkedin.com/in/haatim-ali}{linkedin.com/in/haatim-ali} $\cdot$ \href{https://github.com/Haatim-Ali}{github.com/Haatim-Ali} \\
-\end{tabular*}
-\\
+\begin{center}
+{\huge \textbf{Haatim Ali}}\\[3pt]
+Fremont, CA $\cdot$ (510) 468-7997 $\cdot$ haatimta@gmail.com $\cdot$ \href{https://www.linkedin.com/in/haatim-ali}{linkedin.com/in/haatim-ali} $\cdot$ \href{https://github.com/Haatim-Ali}{github.com/Haatim-Ali}
+\end{center}
+\vspace{-10pt}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \resheading{Education}
@@ -79,7 +79,6 @@ Fremont, CA & \href{https://www.linkedin.com/in/haatim-ali}{linkedin.com/in/haat
 \ressubheading{University of California, Santa Cruz}{Santa Cruz, CA}{Bachelor of Science in Computer Science}{Expected March 2028}
 \begin{itemize}
     \resitem{\textbf{Relevant Coursework:} Python Programming, C++ Programming, Computer Programming in C, Computer Systems \& Assembly Language, Discrete Mathematics, Linear Algebra, Calculus I--II, Statistics}
-    \resitem{\textbf{Campus Involvements:} Alpha Kappa Psi (Historian, Professional Development \& Tech Committee), Grappling Club}
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -89,26 +88,26 @@ Fremont, CA & \href{https://www.linkedin.com/in/haatim-ali}{linkedin.com/in/haat
 \ressubheading{Undergraduate Research Assistant --- Autonomous Vehicles}{Santa Cruz, CA}{AI Explainability and Accountability (AIEA) Lab}{May 2026 -- Present}
 \begin{itemize}
 % %%AIEA_BULLETS_START%%
-    \resitem{Containerized \textbf{PyTorch} CNN training on CIFAR-10 as GPU-backed \textbf{Kubernetes} Jobs on the Nautilus cluster, saving results to persistent volumes so pods freed their GPUs after training, eliminating idle GPU-node costs}
-    \resitem{Implemented and benchmarked \textbf{5} reinforcement learning algorithms (PPO, DQN, SAC, DDPG, Stable Baselines3 baseline) on the CarRacing-v2 continuous-control environment, tracking reward and loss convergence in TensorBoard}
-    \resitem{Engineered a single-file benchmarking framework that automates training, hyperparameter sweeps, and reward-curve generation for \textbf{3+} RL algorithms in parallel, replacing one-off experiment scripts}
+    \resitem{Containerized PyTorch CNN training on CIFAR-10 as GPU-backed Kubernetes Jobs on the Nautilus cluster, saving results to persistent volumes so pods freed their GPUs after training, eliminating idle GPU-node costs}
+    \resitem{Implemented and benchmarked 5 reinforcement learning algorithms (PPO, DQN, SAC, DDPG, Stable Baselines3 baseline) on the CarRacing-v2 continuous-control environment, tracking reward and loss convergence in TensorBoard}
+    \resitem{Engineered a single-file benchmarking framework that automates training, hyperparameter sweeps, and reward-curve generation for 3+ RL algorithms in parallel, replacing one-off experiment scripts}
 % %%AIEA_BULLETS_END%%
 \end{itemize}
 
 \ressubheading{Website Developer}{Milpitas, CA}{Golden Harvest Montessori}{June 2022 -- Present}
 \begin{itemize}
 % %%MONTESSORI_BULLETS_START%%
-    \resitem{Founded and led a \textbf{3}-person team to build the school's website from scratch, supporting \textbf{150+} parent enrollments over \textbf{3} years}
-    \resitem{Traced a production outage on \textbf{6} of \textbf{8} live pages to a legacy CMS stripping script tags and restored jQuery/Bootstrap}
-    \resitem{Re-architected inline styles into modular per-page CSS across \textbf{8} pages, removing \textbf{18+} dead rules with \textbf{zero} visual regressions}
+    \resitem{Founded and led a 3-person team to build the school's website from scratch, supporting 150+ parent enrollments over 3 years}
+    \resitem{Traced a production outage on 6 of 8 live pages to a legacy CMS stripping script tags and restored jQuery/Bootstrap}
+    \resitem{Re-architected inline styles into modular per-page CSS across 8 pages, removing 18+ dead rules with zero visual regressions}
 % %%MONTESSORI_BULLETS_END%%
 \end{itemize}
 
 \ressubheading{Python Programming Camp Instructor}{Milpitas, CA}{Golden Harvest Montessori}{June 2022 -- August 2025}
 \begin{itemize}
-    \resitem{Designed a \textbf{20+} lesson, 4-week Python curriculum covering syntax, control flow, functions, and debugging through projects}
-    \resitem{Recruited, trained, and managed \textbf{2} volunteer TAs to provide 1:1 debugging support across \textbf{6+} hours of daily instruction}
-    \resitem{Taught \textbf{30+} students ages 6--12 per camp to a \textbf{100\%} project completion and live-demo rate; the school adopted the curriculum as its standard summer CS program for \textbf{4} years}
+    \resitem{Designed a 20+ lesson, 4-week Python curriculum covering syntax, control flow, functions, and debugging through projects}
+    \resitem{Recruited, trained, and managed 2 volunteer TAs to provide 1:1 debugging support across 6+ hours of daily instruction}
+    \resitem{Taught 30+ students ages 6--12 per camp to a 100\% project completion and live-demo rate}
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -118,27 +117,29 @@ Fremont, CA & \href{https://www.linkedin.com/in/haatim-ali}{linkedin.com/in/haat
 \ressubheading{JobAgent --- Autonomous Internship Search \& Resume Tailoring Pipeline}{\href{https://github.com/Haatim-Ali/job-agent-v2}{github.com/Haatim-Ali/job-agent-v2}}{Personal project, built out from a 2-person prototype}{March 2026 -- Present}
 \begin{itemize}
 % %%JOBAGENT_BULLETS_START%%
-    \resitem{Built and deployed a \textbf{24/7} Python pipeline on a Linux VPS that pulls LinkedIn and \textbf{7} job-board APIs every \textbf{30 min}, filtering \textbf{49,000+} postings down to \textbf{522} alerts scored by \textbf{Claude Haiku}}
-    \resitem{Generated a tailored LaTeX resume and cover letter for every alert with \textbf{Claude Sonnet} structured outputs, gated by an independent fact-check that rejects any unsupported skill, metric, or claim}
-    \resitem{Shipped with \textbf{200+} automated tests, GitHub Actions CI, and a deploy script that auto-rolls back on failure; a \textbf{Discord bot} delivers alerts and feeds rejection reasons back into scoring}
+    \resitem{Built and deployed a 24/7 Python pipeline on a Linux VPS that pulls LinkedIn and 7 job-board APIs every 30 min, filtering 49,000+ postings down to 522 alerts scored by Claude Haiku}
+    \resitem{Generated a tailored LaTeX resume and cover letter for every alert with Claude Sonnet structured outputs, gated by an independent fact-check that rejects any unsupported skill, metric, or claim}
+    \resitem{Shipped with 200+ automated tests, GitHub Actions CI, and a deploy script that auto-rolls back on failure; a Discord bot delivers alerts and feeds rejection reasons back into scoring}
+    \resitem{Read JavaScript-heavy career sites through their job APIs and a headless Playwright browser, rejecting non-prose pages so every resume targets the real posting}
 % %%JOBAGENT_BULLETS_END%%
 \end{itemize}
 
 \ressubheading{Uplink --- Multi-Agent Food Rescue Negotiation}{\href{https://github.com/Haatim-Ali/uplink}{github.com/Haatim-Ali/uplink}}{UCSC AI Hackathon 2026, Cisco ``When AI Agents Disagree'' track (team of 3)}{October 2026}
 \begin{itemize}
 % %%UPLINK_BULLETS_START%%
-    \resitem{Co-built a food-rescue system where \textbf{3 Claude} agents with competing goals (speed, cost, need) negotiate every delivery, with donations logged by Claude photo counting or ElevenLabs voice}
-    \resitem{Re-architected the agents into \textbf{16} independent processes on Cisco's \textbf{AGNTCY A2A} protocol over \textbf{NATS}, with an agent directory, heartbeats, and \textbf{0} failed messages}
-    \resitem{Built the evaluation harness for \textbf{100} held-out scenarios, showing the agent team cut food lost by \textbf{67\%} vs. the best single agent and \textbf{93\%} vs. a nearest-shelter baseline}
+    \resitem{Co-built a food-rescue system where 3 Claude agents with competing goals (speed, cost, need) negotiate every delivery, with donations logged by Claude photo counting or ElevenLabs voice}
+    \resitem{Re-architected the agents into 16 independent processes on Cisco's AGNTCY A2A protocol over NATS, with an agent directory, heartbeats, and 0 failed messages}
+    \resitem{Built the evaluation harness for 100 held-out scenarios, showing the agent team cut food lost by 67\% vs. the best single agent and 93\% vs. a nearest-shelter baseline}
+    \resitem{Improved Claude photo counting to within 10\% on 33 of 34 test reads by re-reading only low-confidence photos, and added retries so no ElevenLabs voice line dropped}
 % %%UPLINK_BULLETS_END%%
 \end{itemize}
 
 \ressubheading{Pathwise --- Autonomous Financial Planning Agent}{\href{https://github.com/Haatim-Ali/pathwise}{github.com/Haatim-Ali/pathwise}}{Hack-a-Claw 2026, 24-hour NVIDIA hackathon at UCSC Baskin Engineering (team of 3)}{May 2026}
 \begin{itemize}
 % %%PATHWISE_BULLETS_START%%
-    \resitem{Built an agent that turns plain-English finances into a month-by-month plan using \textbf{NVIDIA Nemotron 49B via NIM}}
+    \resitem{Built an agent that turns plain-English finances into a month-by-month plan using NVIDIA Nemotron 49B via NIM}
     \resitem{Grounded recommendations in live HYSA, mortgage, and S\&P 500 rates via the Tavily API, with persistent memory and what-if scenarios that re-plan on demand}
-    \resitem{Shipped a \textbf{Flask + Chart.js} full-stack demo of payoff timelines, surplus allocation, and net worth trajectory within \textbf{24 hours}}
+    \resitem{Shipped a Flask + Chart.js full-stack demo of payoff timelines, surplus allocation, and net worth trajectory within 24 hours}
 % %%PATHWISE_BULLETS_END%%
 \end{itemize}
 
@@ -151,7 +152,6 @@ Fremont, CA & \href{https://www.linkedin.com/in/haatim-ali}{linkedin.com/in/haat
     \resitem{\textbf{Frameworks \& Libraries:} PyTorch, Stable Baselines3, Flask, Next.js, Chart.js, jQuery, Bootstrap}
     \resitem{\textbf{Cloud, Data \& DevOps:} Kubernetes, Linux, Git, GitHub Actions (CI/CD), PostgreSQL, SQLite, REST APIs, pytest}
     \resitem{\textbf{AI/ML:} Claude API, NVIDIA NIM, Multi-Agent Systems, LLM Evaluation, Reinforcement Learning, CNNs}
-    \resitem{\textbf{Interests:} Weightlifting, Soccer, Hiking, Jiu-jitsu, Anime}
 \end{itemize}
 
 \end{document}

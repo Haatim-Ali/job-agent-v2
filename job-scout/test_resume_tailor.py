@@ -22,15 +22,22 @@ def test_template_matches_current_resume_v5():
     assert "Bachelor of Science in Computer Science" in TEMPLATE
     assert "saraxjain/uplink" not in TEMPLATE
     assert "github.com/Haatim-Ali/uplink" in TEMPLATE
-    assert "\\section" not in TEMPLATE and "Technical Skills" in TEMPLATE
+    assert "Technical Skills" in TEMPLATE
+    assert "Campus Involvements" not in TEMPLATE and "Interests" not in TEMPLATE
 
 
 def test_template_disables_ligatures_for_ats():
-    assert "\\DisableLigatures" in TEMPLATE and "glyphtounicode" in TEMPLATE
+    # only f-ligatures: disabling all of them prints -- and `` literally under pdfLaTeX
+    assert "\\DisableLigatures[f]" in TEMPLATE and "glyphtounicode" in TEMPLATE
 
 
-def test_every_section_has_its_three_bullets():
-    assert {m: len(b) for m, b in SECTIONS.items()} == {m: 3 for m in rt.SECTIONS}
+def test_every_section_has_its_bullets():
+    assert {m: len(b) for m, b in SECTIONS.items()} == {
+        "AIEA_BULLETS": 3, "MONTESSORI_BULLETS": 3, "JOBAGENT_BULLETS": 4, "UPLINK_BULLETS": 4, "PATHWISE_BULLETS": 3}
+
+
+def test_template_bullets_have_no_bold():
+    assert all("\\textbf" not in b for bullets in SECTIONS.values() for b in bullets)
 
 
 def test_no_edits_reproduces_template_exactly():
@@ -138,9 +145,9 @@ def test_changed_pairs_and_drop_rejected():
     m = "JOBAGENT_BULLETS"
     orig2 = rt.latex_to_marked(SECTIONS[m][2])
     edited2 = orig2.replace("rejection reasons", "rejection telemetry reasons")
-    edits = {m: [{"id": f"{m}-2", "text": edited2},
-                 {"id": f"{m}-0", "text": rt.latex_to_marked(SECTIONS[m][0])},
-                 {"id": f"{m}-1", "text": rt.latex_to_marked(SECTIONS[m][1])}]}
+    rest = [i for i in range(len(SECTIONS[m])) if i != 2]
+    edits = {m: [{"id": f"{m}-2", "text": edited2}]
+             + [{"id": f"{m}-{i}", "text": rt.latex_to_marked(SECTIONS[m][i])} for i in rest]}
     pairs = rt.changed_pairs(SECTIONS, edits)
     assert [p[0] for p in pairs] == [f"{m}-2"]
     assert "telemetry" in rt.build_verify_prompt(pairs)

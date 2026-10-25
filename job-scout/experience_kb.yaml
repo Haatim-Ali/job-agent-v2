@@ -109,7 +109,7 @@ experience:
     bullets:
       - "Designed a 20+ lesson, 4-week Python curriculum covering syntax, control flow, functions, and debugging through projects"
       - "Recruited, trained, and managed 2 volunteer TAs to provide 1:1 debugging support across 6+ hours of daily instruction"
-      - "Taught 30+ students ages 6–12 per camp to a 100% project completion and live-demo rate; the school adopted the curriculum as its standard summer CS program for 4 years"
+      - "Taught 30+ students ages 6–12 per camp to a 100% project completion and live-demo rate"
     key_metrics:
       - "30+ students taught per camp, ages 6-12"
       - "100% project completion and live-demo rate"
@@ -125,6 +125,7 @@ projects:
       - "Co-built a food-rescue system where 3 Claude agents with competing goals (speed, cost, need) negotiate every delivery, with donations logged by Claude photo counting or ElevenLabs voice"
       - "Re-architected the agents into 16 independent processes on Cisco's AGNTCY A2A protocol over NATS, with an agent directory, heartbeats, and 0 failed messages"
       - "Built the evaluation harness for 100 held-out scenarios, showing the agent team cut food lost by 67% vs. the best single agent and 93% vs. a nearest-shelter baseline"
+      - "Improved Claude photo counting to within 10% on 33 of 34 test reads by re-reading only low-confidence photos, and added retries so no ElevenLabs voice line dropped"
     key_metrics:
       - "93% less food lost than a nearest-shelter baseline, 67% less than the best single agent (100 held-out scenarios)"
       - "16 agent processes over A2A/NATS with 0 failed messages"
@@ -148,6 +149,7 @@ projects:
       - "Built and deployed a 24/7 Python pipeline on a Linux VPS that pulls LinkedIn and 7 job-board APIs every 30 min, filtering 49,000+ postings down to 522 alerts scored by Claude Haiku"
       - "Generated a tailored LaTeX resume and cover letter for every alert with Claude Sonnet structured outputs, gated by an independent fact-check that rejects any unsupported skill, metric, or claim"
       - "Shipped with 200+ automated tests, GitHub Actions CI, and a deploy script that auto-rolls back on failure; a Discord bot delivers alerts and feeds rejection reasons back into scoring"
+      - "Read JavaScript-heavy career sites through their job APIs and a headless Playwright browser, rejecting non-prose pages so every resume targets the real posting"
 
 interests:
   - Weightlifting

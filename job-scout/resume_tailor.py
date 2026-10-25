@@ -271,7 +271,7 @@ Your ONLY allowed changes, per section:
 1. Reorder bullets so the most relevant to this job comes first.
 2. Reword bullets to use the job's terminology wherever it TRUTHFULLY describes what the bullet
    already says, so a recruiter or ATS scanning for this job's keywords finds them. Aim to reword
-   5 to 9 of the 15 bullets, prioritising the ones most relevant to the job; leave the rest exactly
+   about half of the bullets, prioritising the ones most relevant to the job; leave the rest exactly
    as they are. Good edits swap a generic word for the job's precise term, or lead with the part of
    the bullet this job cares about most (e.g. for an infrastructure role, lead with the GPU /
    Kubernetes orchestration; for an ML role, lead with the model and training).
