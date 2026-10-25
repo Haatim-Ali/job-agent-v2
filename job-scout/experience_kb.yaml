@@ -120,7 +120,7 @@ projects:
   - name: Uplink -- Multi-Agent Food Rescue Negotiation
     context: "UCSC AI Hackathon 2026, Cisco \"When AI Agents Disagree\" track (team of 3)"
     dates: October 2026
-    link: github.com/saraxjain/uplink  # teammate's repo: never shown on the resume
+    link: github.com/Haatim-Ali/uplink  # Haatim's fork of the team repo (saraxjain/uplink)
     bullets:
       - "Re-architected a 3-agent Claude negotiation (speed, cost, need) into 16 independent processes on Cisco's AGNTCY A2A protocol over NATS, with an agent directory, heartbeats, and 0 failed messages"
       - "Improved Claude photo counting of donations to within 10% on 33 of 34 test reads by re-reading only low-confidence photos, and added a fallback that keeps ElevenLabs voice intake working"

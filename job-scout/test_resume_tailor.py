@@ -21,6 +21,7 @@ def test_template_matches_current_resume_v4():
     assert "Undergraduate Research Assistant, AI Explainability and Accountability Lab" in TEMPLATE
     assert "Campus Involvements" not in TEMPLATE
     assert "saraxjain/uplink" not in TEMPLATE
+    assert "github.com/Haatim-Ali/uplink" in TEMPLATE
 
 
 def test_template_bullets_have_no_bold():
