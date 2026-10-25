@@ -79,9 +79,9 @@ experience:
     location: Santa Cruz, CA
     dates: May 2026 - Present
     bullets:
-      - "Containerized PyTorch CNN training on CIFAR-10 as GPU-backed Kubernetes Jobs on the Nautilus cluster, saving results to persistent volumes so pods released their GPUs after training, eliminating idle GPU-node costs"
-      - "Benchmarked 5 reinforcement learning algorithms (PPO, DQN, SAC, DDPG, SB3 baseline) on the CarRacing-v2 autonomous driving environment, comparing reward and loss convergence in TensorBoard"
-      - "Developed a single-file benchmarking framework that automated training, hyperparameter sweeps, and reward-curve generation for 3+ algorithms in parallel, replacing one-off experiment scripts"
+      - "Containerized PyTorch CNN training on CIFAR-10 as GPU-backed Kubernetes Jobs on the Nautilus cluster, saving results to persistent volumes so pods freed their GPUs after training, eliminating idle GPU-node costs"
+      - "Implemented and benchmarked 5 reinforcement learning algorithms (PPO, DQN, SAC, DDPG, Stable Baselines3 baseline) on the CarRacing-v2 continuous-control environment, tracking reward and loss convergence in TensorBoard"
+      - "Engineered a single-file benchmarking framework that automates training, hyperparameter sweeps, and reward-curve generation for 3+ RL algorithms in parallel, replacing one-off experiment scripts"
     key_metrics:
       - "5 RL algorithms implemented and benchmarked"
       - "3+ RL algorithms benchmarked in parallel via a custom framework"
@@ -94,8 +94,8 @@ experience:
     dates: June 2022 - Present
     bullets:
       - "Founded and led a 3-person team to build the school's website from scratch, supporting 150+ parent enrollments over 3 years"
-      - "Resolved an outage that broke 6 of 8 pages by tracing it to a legacy CMS stripping script tags, returning the site to full service for enrolling families"
-      - "Refactored inline styles into a modular per-page CSS system, removing 18+ dead rules with zero visual regressions and making pages easier to update"
+      - "Traced a production outage on 6 of 8 live pages to a legacy CMS stripping script tags and restored jQuery/Bootstrap"
+      - "Re-architected inline styles into modular per-page CSS across 8 pages, removing 18+ dead rules with zero visual regressions"
     key_metrics:
       - "150+ parent enrollments driven over 3 years"
       - "Restored functionality across 6 of 8 production pages after root-causing a CMS outage"
@@ -107,9 +107,9 @@ experience:
     location: Milpitas, CA
     dates: June 2022 - August 2025 (summers)
     bullets:
-      - "Designed a 20+ lesson, 4-week Python curriculum teaching syntax, control flow, functions, and debugging through projects"
-      - "Recruited, trained, and managed 2 volunteer TAs to provide 1:1 debugging help across 6+ hours of daily instruction"
-      - "Taught 30+ students per camp, ages 6-12, achieving a 100% project completion and live-demo rate"
+      - "Designed a 20+ lesson, 4-week Python curriculum covering syntax, control flow, functions, and debugging through projects"
+      - "Recruited, trained, and managed 2 volunteer TAs to provide 1:1 debugging support across 6+ hours of daily instruction"
+      - "Taught 30+ students ages 6–12 per camp to a 100% project completion and live-demo rate; the school adopted the curriculum as its standard summer CS program for 4 years"
     key_metrics:
       - "30+ students taught per camp, ages 6-12"
       - "100% project completion and live-demo rate"
@@ -122,32 +122,32 @@ projects:
     dates: October 2026
     link: github.com/Haatim-Ali/uplink  # Haatim's fork of the team repo (saraxjain/uplink)
     bullets:
-      - "Re-architected a 3-agent Claude negotiation (speed, cost, need) into 16 independent processes on Cisco's AGNTCY A2A protocol over NATS, with an agent directory, heartbeats, and 0 failed messages"
-      - "Improved Claude photo counting of donations to within 10% on 33 of 34 test reads by re-reading only low-confidence photos, and added retries so no ElevenLabs voice line dropped"
-      - "Built the team-vs-solo evaluation across 100 held-out scenarios, showing the multi-agent design cut food lost by 67% versus the best single agent and 93% versus a nearest-shelter baseline"
+      - "Co-built a food-rescue system where 3 Claude agents with competing goals (speed, cost, need) negotiate every delivery, with donations logged by Claude photo counting or ElevenLabs voice"
+      - "Re-architected the agents into 16 independent processes on Cisco's AGNTCY A2A protocol over NATS, with an agent directory, heartbeats, and 0 failed messages"
+      - "Built the evaluation harness for 100 held-out scenarios, showing the agent team cut food lost by 67% vs. the best single agent and 93% vs. a nearest-shelter baseline"
     key_metrics:
       - "93% less food lost than a nearest-shelter baseline, 67% less than the best single agent (100 held-out scenarios)"
       - "16 agent processes over A2A/NATS with 0 failed messages"
       - "Photo counts within 10% on 33 of 34 test reads"
     narrative: "Team hackathon project; a teammate started the negotiation and Haatim built the distributed A2A runtime, the evaluation, the photo-accuracy work, and extensions to the agents. Say co-built, not designed."
 
-  - name: Pathwise -- Autonomous Planning Agent
+  - name: Pathwise -- Autonomous Financial Planning Agent
     context: "Hack-a-Claw 2026, 24-hour NVIDIA hackathon at UCSC Baskin Engineering (team of 3)"
     dates: May 2026
     link: github.com/Haatim-Ali/pathwise
     bullets:
-      - "Built an agent turning plain-English finances into month-by-month plans with NVIDIA Nemotron 49B via NIM"
-      - "Grounded each plan in live HYSA, mortgage, and S&P 500 rates via the Tavily API, with persistent memory and what-if scenarios that re-plan on demand"
-      - "Shipped a Flask and Chart.js full-stack demo of payoff timelines, surplus allocation, and net worth trajectory within 24 hours"
+      - "Built an agent that turns plain-English finances into a month-by-month plan using NVIDIA Nemotron 49B via NIM"
+      - "Grounded recommendations in live HYSA, mortgage, and S&P 500 rates via the Tavily API, with persistent memory and what-if scenarios that re-plan on demand"
+      - "Shipped a Flask + Chart.js full-stack demo of payoff timelines, surplus allocation, and net worth trajectory within 24 hours"
 
-  - name: JobAgent -- Autonomous Internship Search & Tailoring Pipeline
+  - name: JobAgent -- Autonomous Internship Search & Resume Tailoring Pipeline
     context: "Personal project, built out from a 2-person prototype"
     dates: March 2026 - Present
     link: github.com/Haatim-Ali/job-agent-v2
     bullets:
-      - "Deployed a 24/7 pipeline on a Debian VPS that pulls LinkedIn and 7 job-board APIs every 30 min, screening 49,000+ postings down to 522 Claude Haiku-scored alerts"
-      - "Automated a LaTeX resume and cover letter tailored by Claude Sonnet for every alert, guarded by an independent fact-check that rejects any added skill, metric, or claim"
-      - "Ensured reliability with 200+ automated tests, CI, and a deploy script that auto-rolls back on failure, plus a Discord bot that feeds rejection reasons back into scoring"
+      - "Built and deployed a 24/7 Python pipeline on a Linux VPS that pulls LinkedIn and 7 job-board APIs every 30 min, filtering 49,000+ postings down to 522 alerts scored by Claude Haiku"
+      - "Generated a tailored LaTeX resume and cover letter for every alert with Claude Sonnet structured outputs, gated by an independent fact-check that rejects any unsupported skill, metric, or claim"
+      - "Shipped with 200+ automated tests, GitHub Actions CI, and a deploy script that auto-rolls back on failure; a Discord bot delivers alerts and feeds rejection reasons back into scoring"
 
 interests:
   - Weightlifting

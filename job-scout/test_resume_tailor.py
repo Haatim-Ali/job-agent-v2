@@ -17,15 +17,16 @@ def test_template_has_no_tagline_or_headline():
     assert "TAGLINE" not in TEMPLATE
 
 
-def test_template_matches_current_resume_v4():
-    assert "Undergraduate Research Assistant, AI Explainability and Accountability Lab" in TEMPLATE
-    assert "Campus Involvements" not in TEMPLATE
+def test_template_matches_current_resume_v5():
+    assert "AI Explainability and Accountability (AIEA) Lab" in TEMPLATE
+    assert "Bachelor of Science in Computer Science" in TEMPLATE
     assert "saraxjain/uplink" not in TEMPLATE
     assert "github.com/Haatim-Ali/uplink" in TEMPLATE
+    assert "\\section" not in TEMPLATE and "Technical Skills" in TEMPLATE
 
 
-def test_template_bullets_have_no_bold():
-    assert all("\\textbf" not in b for bullets in SECTIONS.values() for b in bullets)
+def test_template_disables_ligatures_for_ats():
+    assert "\\DisableLigatures" in TEMPLATE and "glyphtounicode" in TEMPLATE
 
 
 def test_every_section_has_its_three_bullets():
@@ -121,8 +122,8 @@ def test_revert_one_restores_largest_growth_in_place():
     m = "AIEA_BULLETS"
     o0 = rt.latex_to_marked(SECTIONS[m][0])
     o2 = rt.latex_to_marked(SECTIONS[m][2])
-    edits = {m: [{"id": f"{m}-2", "text": o2.replace("Developed", "Built a")},
-                 {"id": f"{m}-0", "text": o0.replace("pods released", "the pods released")},
+    edits = {m: [{"id": f"{m}-2", "text": o2.replace("Engineered", "Built")},
+                 {"id": f"{m}-0", "text": o0.replace("pods freed", "the pods freed")},
                  {"id": f"{m}-1", "text": rt.latex_to_marked(SECTIONS[m][1])}]}
     result, sources, changes = rt.apply_edits(SECTIONS, edits)
     assert [c["status"] for c in changes] == ["edited", "edited"]
