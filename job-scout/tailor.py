@@ -188,10 +188,22 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
     edit_schema = obj({m: arr(obj({"id": {"type": "string", "enum": [f"{m}-{i}" for i in range(len(b))]},
                                    "text": STR}))
                        for m, b in originals.items()})
+    edit_prompt = resume_tailor.build_prompt(originals, analysis, custom_prompt, job_description)
+    min_changed = resume_tailor.rewrite_target(sum(len(b) for b in originals.values()))[0]
     try:
-        edits = ask_json(client, resume_tailor.build_prompt(originals, analysis, custom_prompt, job_description),
-                         edit_schema, max_tokens=16000, temperature=0.3,
+        edits = ask_json(client, edit_prompt, edit_schema, max_tokens=16000, temperature=0.3,
                          effort=EFFORT["edits"], label="resume edits")
+        changed = resume_tailor.count_reworded(originals, edits)
+        logging.info(f"Resume edit pass: {changed} bullet(s) reworded")
+        if changed < min_changed:
+            # Claude sometimes returns the bullets untouched; ask once more so every role gets tailored
+            retry = ask_json(client, edit_prompt + resume_tailor.build_retry_note(changed, originals),
+                             edit_schema, max_tokens=16000, temperature=0.5,
+                             effort=EFFORT["edits"], label="resume edits (retry)")
+            retry_changed = resume_tailor.count_reworded(originals, retry)
+            logging.info(f"Resume edit retry: {retry_changed} bullet(s) reworded")
+            if retry_changed > changed:
+                edits = retry
     except Exception as e:
         logging.warning(f"Resume edit pass failed, using baseline resume: {e}")
 

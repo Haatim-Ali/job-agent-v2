@@ -540,7 +540,7 @@ Only the 17 bullets in five sections can change: AIEA Lab (3), Website Developer
 
 1. **Extract.** `extract_sections` finds each marker block and pulls out the argument of every `\resitem{...}`, counting braces so nested ones like `\textbf{...}` don't end it early (a **brace-balanced parse**).
 2. **Convert to editable text.** `latex_to_marked` turns `\textbf{Kubernetes}` into `**Kubernetes**` and unescapes symbols, so Claude sees clean text with Markdown-style bold. Each bullet gets an ID like `AIEA_BULLETS-0`.
-3. **Ask for edits.** The prompt (`build_prompt`) gives the analysis, the job description and the bullets, and allows exactly three kinds of change: reorder bullets within a section, reword toward the job's terminology where it's true (aiming for 5 to 9 of the 15), and keep bold as it is (a bullet with no bold must stay without bold; where a bullet has bold, it may move onto a job-relevant term). The reply is JSON in the same shape, every ID exactly once.
+3. **Ask for edits.** The prompt (`build_prompt`) gives the analysis, the job description and the bullets, and allows exactly three kinds of change: reorder bullets within a section, reword toward the job's terminology where it's true (about 40-55% of the bullets, 7 to 9 of the 17; required, not optional), and keep bold as it is (a bullet with no bold must stay without bold; where a bullet has bold, it may move onto a job-relevant term). The reply is JSON in the same shape, every ID exactly once. Because the bullets already fill their lines, the prompt says to make room by swapping words or dropping a minor detail (never a number) rather than adding words. If fewer than the target number of bullets come back reworded, the bot asks once more (`build_retry_note`, temperature 0.5) and keeps whichever answer reworded more; the log line `Resume edit pass: N bullet(s) reworded` shows how many.
 4. **Mechanical validation** (`validate_edit`), in code. An edit is rejected, and the original kept, if it:
    - is empty, or has unbalanced `**` markers
    - is more than 5% plus 6 characters longer (`MAX_GROWTH = 1.05`, `GROWTH_SLACK = 6`), or under 70% of the original length (`MIN_SHRINK = 0.70`)
@@ -995,6 +995,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-26: resumes came back untailored.** Two NVIDIA Workday roles (Autonomous Vehicles, Deep Learning) produced resumes differing only in one word and the project order. The job descriptions were read correctly; Claude was returning all 17 bullets unchanged, because the prompt said the resume "must look identical", called the tailoring "light", and (since v7) said to keep the outcome at the start, while the 5% length cap left no room on page-filling bullets. Fix: the prompt now requires rewording 7 to 9 bullets, allows rewording both the outcome and the "by ..." part, and says to make room by swapping words or dropping a minor detail (never a number); if too few bullets come back changed, the bot retries once. Tested live on both postings: 7 and 8 bullets reworded (was 0 and 1). 3 tests added.
 
 **2026-10-25: v7 base resume.** Every bullet rewritten result-first (outcome, then "by ..." how), after comparing with a friend's resume that did better in recruiting. Camp cut to 2 bullets; a Leadership line (Alpha Kappa Psi Historian) added under Education. The tailor prompt now tells Claude to keep the outcome at the start of each bullet.
 

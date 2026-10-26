@@ -175,3 +175,31 @@ def test_bold_added_to_unbolded_bullet_is_stripped_not_rejected():
     edits = {m: [{"id": f"{m}-{i}", "text": new if i == 1 else rt.latex_to_marked(SECTIONS[m][i])} for i in range(3)]}
     result, _, changes = rt.apply_edits(SECTIONS, edits)
     assert result[m][1] == SECTIONS[m][1] and not changes   # bold dropped, nothing else changed
+
+
+def test_rewrite_target_is_about_half():
+    assert rt.rewrite_target(17) == (7, 9)
+    assert rt.rewrite_target(1) == (1, 1)
+
+
+def test_count_reworded_ignores_unchanged_and_bold_only_changes():
+    sections = {"A_BULLETS": ["Built X with Python", "Ran Y on GPUs"]}
+    same = {"A_BULLETS": [{"id": "A_BULLETS-1", "text": "Ran Y on GPUs"},
+                          {"id": "A_BULLETS-0", "text": "Built **X** with Python"}]}
+    assert rt.count_reworded(sections, same) == 0
+    changed = {"A_BULLETS": [{"id": "A_BULLETS-0", "text": "Built X in Python"},
+                             {"id": "A_BULLETS-1", "text": "Ran Y on GPUs"}]}
+    assert rt.count_reworded(sections, changed) == 1
+    assert rt.count_reworded(sections, {}) == 0
+
+
+def test_prompt_requires_a_rewrite_count():
+    # Regression: v7's result-first rule made Claude return every bullet untouched (NVIDIA, 2026-10-26)
+    tpl = open(os.path.join(os.path.dirname(__file__), "ResumeTemplate.tex")).read()
+    sections = rt.extract_sections(tpl)
+    p = rt.build_prompt(sections, {"role_title": "R", "company": "C"})
+    lo, hi = rt.rewrite_target(sum(len(b) for b in sections.values()))
+    assert f"{lo} to {hi} of the" in p
+    assert "must look identical after tailoring" not in p
+    note = rt.build_retry_note(0, sections)
+    assert "reworded only 0" in note and f"{lo} to {hi}" in note

@@ -252,29 +252,61 @@ def drop_rejected(sections, edits, rejected_ids):
 
 # ── Claude prompt ─────────────────────────────────────────────────────────────
 
+def rewrite_target(total):
+    """How many bullets the edit pass should reword: about 40-55% of them."""
+    return max(1, round(total * 0.4)), max(1, round(total * 0.55))
+
+
+def count_reworded(sections, edits):
+    """Number of bullets whose proposed text differs from the original (ignoring bold markers)."""
+    n = 0
+    for marker, originals in sections.items():
+        proposed = edits.get(marker) if isinstance(edits, dict) else None
+        if not isinstance(proposed, list):
+            continue
+        texts = {p.get("id"): p.get("text") for p in proposed if isinstance(p, dict)}
+        for i, b in enumerate(originals):
+            new = texts.get(f"{marker}-{i}")
+            if isinstance(new, str) and plain(new).strip() != plain(latex_to_marked(b)).strip():
+                n += 1
+    return n
+
+
+def build_retry_note(changed, sections):
+    """Follow-up instruction when the edit pass reworded too few bullets."""
+    lo, hi = rewrite_target(sum(len(b) for b in sections.values()))
+    return (f"\n\nYour previous answer reworded only {changed} bullet(s), so the resume was not tailored "
+            f"to this job. Reword {lo} to {hi} bullets this time, using the job's terminology "
+            "wherever it truthfully fits. The same hard rules apply.")
+
+
 def build_prompt(sections, analysis, custom_prompt="", job_description=""):
     blocks = []
     for marker, bullets in sections.items():
         lines = [f'  {{"id": "{marker}-{i}", "text": {json.dumps(latex_to_marked(b), ensure_ascii=False)}}}'
                  for i, b in enumerate(bullets)]
         blocks.append(f'"{marker}": [  // {SECTION_LABELS[marker]}\n' + ",\n".join(lines) + "\n]")
+    total = sum(len(b) for b in sections.values())
+    lo, hi = rewrite_target(total)
     custom = f"\nADDITIONAL INSTRUCTIONS FROM THE CANDIDATE:\n{custom_prompt}\n" if custom_prompt else ""
     jd = f"\nJob description (excerpt):\n{job_description[:3500]}\n" if job_description else ""
-    return f"""You are lightly tailoring a strong, already-polished one-page resume for this job:
+    return f"""You are tailoring a strong one-page resume so it reads as written for this specific job:
 Role: {analysis.get("role_title")} at {analysis.get("company")}
 Must have: {json.dumps(analysis.get("must_have", []))}
 Nice to have: {json.dumps(analysis.get("nice_to_have", []))}
 ATS keywords: {json.dumps(analysis.get("ats_keywords", []))}
 {jd}{custom}
-The candidate's resume is carefully formatted and must look identical after tailoring.
+The candidate's resume is carefully formatted: its layout must stay identical (same sections,
+same number of bullets, similar bullet lengths), but its WORDING must shift toward this job.
 Your ONLY allowed changes, per section:
 1. Reorder bullets so the most relevant to this job comes first.
 2. Reword bullets to use the job's terminology wherever it TRUTHFULLY describes what the bullet
-   already says, so a recruiter or ATS scanning for this job's keywords finds them. Aim to reword
-   about half of the bullets, prioritising the ones most relevant to the job; leave the rest exactly
-   as they are. Good edits swap a generic word for the job's precise term, or lead with the part of
-   the bullet this job cares about most (e.g. for an infrastructure role, lead with the GPU /
-   Kubernetes orchestration; for an ML role, lead with the model and training).
+   already says, so a recruiter or ATS scanning for this job's keywords finds them. Reword
+   {lo} to {hi} of the {total} bullets (this is required, not optional), prioritising the ones most
+   relevant to the job; leave the rest exactly as they are. Good edits swap a generic word for the
+   job's precise term, or bring forward the part of the bullet this job cares about most (e.g. for
+   an infrastructure role, the GPU / Kubernetes orchestration; for an ML role, the model and
+   training). Every bullet already has some wording a job-specific term can truthfully replace.
    Bad edits claim anything the bullet doesn't already say.
 3. Keep bold as it is: a bullet with no **bold** must stay without bold; where a bullet has
    bold, you may move it onto the most job-relevant term or number already in the bullet.
@@ -283,13 +315,16 @@ Think about which of the candidate's real strengths this job values most, and ma
 bullets come first in their section and read in the job's language.
 
 Hard rules (edits that break these are automatically discarded):
-- Keep every fact, tool name and number. Never add a tool, metric, outcome or responsibility
-  that isn't already in that bullet.
-- Same length or shorter: never more than 5% longer than the original bullet.
+- Keep every number. Never add a tool, metric, outcome or responsibility that isn't already in
+  that bullet.
+- Same length or shorter: never more than 5% longer than the original bullet. The bullets already
+  fill their lines, so make room for the job's terms by swapping words rather than adding them, or
+  by dropping a minor detail this job cares less about (never a number).
 - Keep every bullet: same ids, no additions, no deletions, no merging.
 - No em dashes unless the original bullet already has one. Keep **bold** markers balanced.
 - Match the existing style: past-tense action verb first, no period at the end. Bullets are
-  result-first (outcome, then "by ..." how); keep the outcome at the start of the bullet.
+  result-first (outcome, then "by ..." how): keep that shape, but you may reword both the
+  outcome and the "by ..." part in the job's terms, or lead with a different true outcome.
 
 Current bullets (text uses **bold** markers):
 {{
