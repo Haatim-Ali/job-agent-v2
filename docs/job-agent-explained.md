@@ -1001,6 +1001,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 
 # Changelog
 
+**2026-10-26: school email.** Resume, cover letter and knowledge base now use htali@ucsc.edu instead of haatimta@gmail.com.
+
 **2026-10-26: #job-alerts is alerts-only.** Alerts are no longer tailored automatically (`tailor_every_alert: false`); 👍 tailors on demand. Every reply to a reaction on an alert (tailored files, applied, dismiss question) and the watchdog warning now go to the actions channel (#applications by default, `ACTIONS_CHANNEL_ID` to override), with a link back to the alert. 3 tests added.
 
 **2026-10-26: real per-job tailoring.** Word swaps inside fixed bullets left resumes for different roles nearly identical (a Systems Software Engineering resume changed two words). The tailor now picks each section's bullets from a bank of verified alternates (`bullet_bank.yaml`), rewords them, and reorders projects and coursework, and regroups Technical Skills from Haatim's real skills (`validate_skills`, `fit_skills`). New template markers: `%%COURSEWORK%%`, `%%PROJECTS%%`, `%%SKILLS%%`. The layout guard also reverts alternates and skills. Tested live on two NVIDIA roles: the Systems resume leads with Computer Systems & Assembly, C and Linux/systemd work; the Deep Learning one with C++, Linear Algebra, deep learning training and an "ML & GPU" skills line. 11 tests added.

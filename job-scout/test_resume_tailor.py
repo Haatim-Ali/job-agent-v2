@@ -320,3 +320,11 @@ def test_fit_skills_trims_the_tail_of_overlong_lines():
     assert len(l0["label"]) + 2 + len(", ".join(l0["items"])) <= rt.SKILL_LINE_MAX
     assert l0["items"][:3] == ["Linux", "Git", "Kubernetes"]
     assert rt.fit_skills(None) == (None, [])
+
+
+def test_resume_and_cover_letter_use_school_email():
+    # Haatim's application email is htali@ucsc.edu (2026-10-26)
+    here = os.path.dirname(__file__)
+    for name in ("ResumeTemplate.tex", "CoverLetterTemplate.tex", "experience_kb.yaml"):
+        text = open(os.path.join(here, name), encoding="utf-8").read()
+        assert "htali@ucsc.edu" in text and "haatimta@gmail.com" not in text, name
