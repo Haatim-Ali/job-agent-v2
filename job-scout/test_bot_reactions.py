@@ -46,7 +46,8 @@ def test_reactions_in_job_alerts_are_answered_in_the_actions_channel(monkeypatch
     monkeypatch.setattr(bot, "REQUESTS_CHANNEL_ID", 2)
     monkeypatch.setattr(bot, "ACTIONS_CHANNEL_ID", 3)
     assert bot.reply_channel_id(1) == 3
-    assert bot.reply_channel_id(2) == 2 and bot.reply_channel_id(3) == 3
+    # ✅ on a tailored-files message in #requests answers in #reactions too (2026-10-26)
+    assert bot.reply_channel_id(2) == 3 and bot.reply_channel_id(3) == 3
     assert bot.bot_channels() == {1, 2, 3}
 
 

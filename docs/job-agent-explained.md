@@ -456,7 +456,7 @@ Then the job is marked seen. If it came from Greenhouse, Lever or Ashby it's add
 
 ## Tailored files with every alert
 
-**Since 2026-10-26, tailoring runs only when you react 👍 on an alert**, and #job-alerts holds nothing but alerts. Everything a reaction triggers is posted in the **actions channel** (`ACTIONS_CHANNEL_ID` in `.env`, defaulting to #applications, which can be renamed in Discord, e.g. to #reactions, without changing its ID): the "On it" note and the "📎 Tailored resume + cover letter: <role> @ <company>" files from 👍, the "✅ Logged application" note, and the "why are you passing?" question from ❌ (answer it there). Each reply links back to its alert. The scraper watchdog's warnings go there too. ✅ also works on the 📎 message. `bot.reply_channel_id` decides where replies go. (From 2026-10-04 to 10-26 every alert was tailored automatically and the files posted under it in #job-alerts; that is `tailor_alerts`, still in `scraper.py`, behind `tailor_every_alert`, now `false` in `scraper_config.json`.)
+**Since 2026-10-26, tailoring runs only when you react 👍 on an alert**, and #job-alerts holds nothing but alerts. Everything a reaction triggers is posted in the **actions channel** (`ACTIONS_CHANNEL_ID` in `.env`, defaulting to #applications, which can be renamed in Discord, e.g. to #reactions, without changing its ID): the "On it" note and the "📎 Tailored resume + cover letter: <role> @ <company>" files from 👍, the "✅ Logged application" note, and the "why are you passing?" question from ❌ (answer it there). Each reply links back to its alert. This applies to a reaction in any channel: ✅ on a 📎 message in #requests also answers in the actions channel. The scraper watchdog's warnings go there too. `bot.reply_channel_id` decides where replies go. (The #requests conversation itself, posting a link and the bot asking what you need, stays in #requests.) (From 2026-10-04 to 10-26 every alert was tailored automatically and the files posted under it in #job-alerts; that is `tailor_alerts`, still in `scraper.py`, behind `tailor_every_alert`, now `false` in `scraper_config.json`.)
 
 # Part 5: The Discord bot (`bot.py`)
 
@@ -1000,6 +1000,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-26: every reaction answers in #reactions.** A ✅ on a tailored-files message in #requests had its "Logged application" reply posted in #requests; replies to reactions in any channel now go to the actions channel (renamed #reactions in Discord).
 
 **2026-10-26: school email.** Resume, cover letter and knowledge base now use htali@ucsc.edu instead of haatimta@gmail.com.
 

@@ -47,10 +47,9 @@ DISMISS_EMOJI = "❌"
 
 
 def reply_channel_id(source_channel_id):
-    """Where the bot answers something that happened in source_channel_id: never in #job-alerts."""
-    if source_channel_id == CHANNEL_ID and ACTIONS_CHANNEL_ID:
-        return ACTIONS_CHANNEL_ID
-    return source_channel_id
+    """Where the bot answers a reaction made in source_channel_id: always the actions channel
+    (#reactions), wherever the reaction was, so #job-alerts and #requests don't fill up."""
+    return ACTIONS_CHANNEL_ID or source_channel_id
 
 
 def bot_channels():
@@ -82,10 +81,10 @@ HELP_TEXT = """**Job Scout Commands:**
 `!note <job_url> <note>` — add a note to an application
 `!help` — show this message
 
-**Reactions on job alerts** (#job-alerts stays alerts-only; the bot answers in #applications):
+**Reactions on job alerts** (#job-alerts stays alerts-only; the bot answers every reaction in #reactions):
 👍 — generate tailored resume + cover letter
 ✅ — mark as applied
-❌ — dismiss (bot asks why in #applications, helps it learn your preferences)
+❌ — dismiss (bot asks why in #reactions, helps it learn your preferences)
 
 **#requests channel:**
 Post a job URL or PDF and the bot will ask what you want.
@@ -325,7 +324,8 @@ async def on_raw_reaction_add(payload):
     reply_id = reply_channel_id(payload.channel_id)
     channel = source if reply_id == payload.channel_id else (
         client.get_channel(reply_id) or await client.fetch_channel(reply_id))
-    alert_link = f" ([alert]({message.jump_url}))" if reply_id != payload.channel_id else ""
+    source_name = "alert" if payload.channel_id == CHANNEL_ID else "message"
+    alert_link = f" ([{source_name}]({message.jump_url}))" if reply_id != payload.channel_id else ""
 
     # ── Tailor resume ──────────────────────────────────────────────────────
     if emoji == TAILOR_EMOJI:
