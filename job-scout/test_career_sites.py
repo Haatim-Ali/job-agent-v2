@@ -272,7 +272,7 @@ class TestTailorAlerts:
         assert scraper.tailor_alerts([{"job_url": "https://x/1"}], runner=runner) == 0
 
     def test_packets_are_off_by_default(self, scraper):
-        assert scraper.APPLICATION_PACKETS is False and scraper.TAILOR_EVERY_ALERT is True
+        assert scraper.APPLICATION_PACKETS is False and scraper.TAILOR_EVERY_ALERT is False   # 👍-only since 2026-10-26
 
 
 class TestSephoraWatch:

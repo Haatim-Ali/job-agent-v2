@@ -141,7 +141,7 @@
     "recruit",
     "marketing"
   ],
-  "tailor_every_alert": true,
+  "tailor_every_alert": false,
   "max_tailored_per_run": 15,
   "application_packets": false,
   "watch_internships": [

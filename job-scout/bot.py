@@ -29,6 +29,10 @@ load_dotenv()
 BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN")
 CHANNEL_ID = int(os.getenv("DISCORD_CHANNEL_ID", "0"))
 REQUESTS_CHANNEL_ID = int(os.getenv("REQUESTS_CHANNEL_ID", "0"))
+# #job-alerts holds job alerts only. Everything a reaction triggers there (tailored files, "logged",
+# "why are you passing?", watchdog warnings) goes to this channel instead. Defaults to #applications,
+# which can be renamed in Discord (e.g. to #reactions) without changing its ID.
+ACTIONS_CHANNEL_ID = int(os.getenv("ACTIONS_CHANNEL_ID") or os.getenv("APPLICATIONS_CHANNEL_ID") or "0")
 DISCORD_USER_ID = int(os.getenv("DISCORD_USER_ID", "0"))
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 VENV_PYTHON = os.path.join(SCRIPT_DIR, "venv", "bin", "python")
@@ -40,6 +44,18 @@ TAILOR_EMOJI = "👍"
 APPLIED_EMOJI = "✅"
 APPLIED_EMOJI_ALIASES = {APPLIED_EMOJI, "📨"}
 DISMISS_EMOJI = "❌"
+
+
+def reply_channel_id(source_channel_id):
+    """Where the bot answers something that happened in source_channel_id: never in #job-alerts."""
+    if source_channel_id == CHANNEL_ID and ACTIONS_CHANNEL_ID:
+        return ACTIONS_CHANNEL_ID
+    return source_channel_id
+
+
+def bot_channels():
+    """Channels whose messages and reactions the bot handles."""
+    return {c for c in (CHANNEL_ID, REQUESTS_CHANNEL_ID, ACTIONS_CHANNEL_ID) if c}
 
 
 def normalize_emoji(emoji):
@@ -66,10 +82,10 @@ HELP_TEXT = """**Job Scout Commands:**
 `!note <job_url> <note>` — add a note to an application
 `!help` — show this message
 
-**Reactions on job alerts:**
+**Reactions on job alerts** (#job-alerts stays alerts-only; the bot answers in #applications):
 👍 — generate tailored resume + cover letter
 ✅ — mark as applied
-❌ — dismiss (bot will ask why, helps it learn your preferences)
+❌ — dismiss (bot asks why in #applications, helps it learn your preferences)
 
 **#requests channel:**
 Post a job URL or PDF and the bot will ask what you want.
@@ -265,14 +281,15 @@ _watchdog_started = False
 
 
 async def scraper_watchdog():
-    """Every 15 minutes: warn once in #job-alerts if the scraper has stopped finishing runs,
+    """Every 15 minutes: warn once (in the actions channel, keeping #job-alerts clean) if the scraper has stopped finishing runs,
     and once more when it recovers (see heartbeat.py)."""
     stale = False
     while True:
         try:
             stale, message = heartbeat.check(stale)
             if message:
-                channel = client.get_channel(CHANNEL_ID) or await client.fetch_channel(CHANNEL_ID)
+                cid = reply_channel_id(CHANNEL_ID)
+                channel = client.get_channel(cid) or await client.fetch_channel(cid)
                 mention = f"<@{DISCORD_USER_ID}> " if DISCORD_USER_ID else ""
                 await channel.send(mention + message)
                 logging.warning(f"Watchdog: {message}")
@@ -295,15 +312,20 @@ async def on_ready():
 async def on_raw_reaction_add(payload):
     if payload.user_id == client.user.id:
         return
-    if payload.channel_id not in (CHANNEL_ID, REQUESTS_CHANNEL_ID):
+    if payload.channel_id not in bot_channels():
         return
 
     emoji = normalize_emoji(payload.emoji)
-    channel = client.get_channel(payload.channel_id)
-    if not channel:
-        channel = await client.fetch_channel(payload.channel_id)
+    source = client.get_channel(payload.channel_id)
+    if not source:
+        source = await client.fetch_channel(payload.channel_id)
+    message = await source.fetch_message(payload.message_id)
 
-    message = await channel.fetch_message(payload.message_id)
+    # Replies go to the actions channel, never #job-alerts (which stays alerts-only)
+    reply_id = reply_channel_id(payload.channel_id)
+    channel = source if reply_id == payload.channel_id else (
+        client.get_channel(reply_id) or await client.fetch_channel(reply_id))
+    alert_link = f" ([alert]({message.jump_url}))" if reply_id != payload.channel_id else ""
 
     # ── Tailor resume ──────────────────────────────────────────────────────
     if emoji == TAILOR_EMOJI:
@@ -317,6 +339,8 @@ async def on_raw_reaction_add(payload):
                 f"<@{payload.user_id}> Just post a URL or PDF in this channel and I'll ask what you need."
             )
             return
+        elif payload.channel_id != CHANNEL_ID:
+            return          # 👍 only means "tailor" on an alert card
         else:
             # Job alerts channel: embeds from scrapers
             if not message.embeds:
@@ -331,12 +355,12 @@ async def on_raw_reaction_add(payload):
 
         await channel.send(
             f"<@{payload.user_id}> On it! Generating tailored resume and cover letter for:\n"
-            f"> **{role_name}**\n\nGive me 30-60 seconds..."
+            f"> **{role_name}**{alert_link}\n\nGive me 30-60 seconds..."
         )
         logging.info(f"Tailoring triggered for: {job_url} (custom_prompt: {custom_prompt[:100]})")
 
         # Build command args
-        tailor_cmd = [VENV_PYTHON, os.path.join(SCRIPT_DIR, "tailor.py"), job_url, str(payload.channel_id)]
+        tailor_cmd = [VENV_PYTHON, os.path.join(SCRIPT_DIR, "tailor.py"), job_url, str(reply_id)]
         if custom_prompt:
             tailor_cmd.extend(["--prompt", custom_prompt])
 
@@ -373,7 +397,7 @@ async def on_raw_reaction_add(payload):
         )
         await channel.send(
             f"<@{payload.user_id}> ✅ Logged application!\n"
-            f"> **{title.strip()}** at **{company.strip()}**\n"
+            f"> **{title.strip()}** at **{company.strip()}**{alert_link}\n"
             + (f"📊 Tracker: {sheet_result}\n" if sheet_result else "")
             + "Use `!status <url> phone_screen` when you hear back."
         )
@@ -388,8 +412,8 @@ async def on_raw_reaction_add(payload):
 
         # Ask for reason, store pending state
         prompt_msg = await channel.send(
-            f"<@{payload.user_id}> Dismissed **{title.strip()}** at **{company.strip()}**.\n"
-            f"Why are you passing? Reply with a reason (or `skip` to skip). This helps me learn your preferences."
+            f"<@{payload.user_id}> Dismissed **{title.strip()}** at **{company.strip()}**{alert_link}.\n"
+            f"Why are you passing? Reply here with a reason (or `skip` to skip). This helps me learn your preferences."
         )
 
         pending_rejections[payload.user_id] = {
@@ -455,7 +479,7 @@ async def _run_tailor(channel, user_id, job_url, custom_prompt, jd_file=None):
 async def on_message(message):
     if message.author == client.user:
         return
-    if message.channel.id not in (CHANNEL_ID, REQUESTS_CHANNEL_ID):
+    if message.channel.id not in bot_channels():
         return
 
     content = message.content.strip()

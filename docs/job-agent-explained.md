@@ -456,7 +456,7 @@ Then the job is marked seen. If it came from Greenhouse, Lever or Ashby it's add
 
 ## Tailored files with every alert
 
-Since 2026-10-04, every job alerted in a run gets a tailored resume and cover letter. After scraping finishes (so alerts aren't delayed), `tailor_alerts` runs `tailor.py <job_url> <#job-alerts id>` once per alerted job, up to `max_tailored_per_run` (15). The job description the scraper already has is passed with `--jd-file`; when it's under 400 characters (SimplifyJobs listings have none), `tailor.py` fetches the posting itself. Each takes about a minute and posts "📎 Tailored resume + cover letter: <role> @ <company>" under the alert, with `Haatim_Ali_<Company>_Resume.pdf`, the cover letter, and `Haatim_Ali_<Company>_Interview_Prep.txt` (the gaps to prepare for, attached as a file so they don't fill the channel). The bot records the resume for the Sheet's Resume Used column, so ✅ on the alert links it. 👍 still re-tailors on demand, for example with custom instructions in #requests. Settings: `tailor_every_alert` and `max_tailored_per_run` in `scraper_config.json`.
+**Since 2026-10-26, tailoring runs only when you react 👍 on an alert**, and #job-alerts holds nothing but alerts. Everything a reaction triggers is posted in the **actions channel** (`ACTIONS_CHANNEL_ID` in `.env`, defaulting to #applications, which can be renamed in Discord, e.g. to #reactions, without changing its ID): the "On it" note and the "📎 Tailored resume + cover letter: <role> @ <company>" files from 👍, the "✅ Logged application" note, and the "why are you passing?" question from ❌ (answer it there). Each reply links back to its alert. The scraper watchdog's warnings go there too. ✅ also works on the 📎 message. `bot.reply_channel_id` decides where replies go. (From 2026-10-04 to 10-26 every alert was tailored automatically and the files posted under it in #job-alerts; that is `tailor_alerts`, still in `scraper.py`, behind `tailor_every_alert`, now `false` in `scraper_config.json`.)
 
 # Part 5: The Discord bot (`bot.py`)
 
@@ -774,7 +774,7 @@ Column I gets a **formula**, `=HYPERLINK("https://discord.com/channels/…", "Ha
 
 ## Discord
 
-- **Server channels:** #job-alerts (alerts, reactions), #applications (📦 and ✅ notices), #requests (tailor any URL or PDF), #general.
+- **Server channels:** #job-alerts (alerts only; you react there), #applications (the actions channel: everything a reaction triggers, plus ✅ notices), #requests (tailor any URL or PDF), #general.
 - **Three ways the code talks to Discord:**
   1. **Webhook** (scraper alerts): simplest, one channel, no login.
   2. **Gateway WebSocket** (`bot.py`, and `tailor.py` briefly): receives events in real time.
@@ -1000,6 +1000,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-26: #job-alerts is alerts-only.** Alerts are no longer tailored automatically (`tailor_every_alert: false`); 👍 tailors on demand. Every reply to a reaction on an alert (tailored files, applied, dismiss question) and the watchdog warning now go to the actions channel (#applications by default, `ACTIONS_CHANNEL_ID` to override), with a link back to the alert. 3 tests added.
 
 **2026-10-26: real per-job tailoring.** Word swaps inside fixed bullets left resumes for different roles nearly identical (a Systems Software Engineering resume changed two words). The tailor now picks each section's bullets from a bank of verified alternates (`bullet_bank.yaml`), rewords them, and reorders projects and coursework, and regroups Technical Skills from Haatim's real skills (`validate_skills`, `fit_skills`). New template markers: `%%COURSEWORK%%`, `%%PROJECTS%%`, `%%SKILLS%%`. The layout guard also reverts alternates and skills. Tested live on two NVIDIA roles: the Systems resume leads with Computer Systems & Assembly, C and Linux/systemd work; the Deep Learning one with C++, Linear Algebra, deep learning training and an "ML & GPU" skills line. 11 tests added.
 

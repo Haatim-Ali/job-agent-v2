@@ -72,8 +72,9 @@ ROLE_KEYWORDS = _cfg.get("role_keywords", [])
 INTERN_KEYWORDS = _cfg.get("intern_keywords", [])
 CAREER_SITE_EXCLUDE_TITLES = _cfg.get("career_site_exclude_titles", [])
 REPOST_SIGNALS = _cfg["repost_signals"]
-# Every alert gets its tailored resume + cover letter posted under it (tailor_alerts).
-TAILOR_EVERY_ALERT = _cfg.get("tailor_every_alert", True)
+# Off since 2026-10-26: #job-alerts holds alerts only, and tailoring runs only when Haatim reacts 👍
+# (results go to the actions channel). Set true to tailor every alert automatically (tailor_alerts).
+TAILOR_EVERY_ALERT = _cfg.get("tailor_every_alert", False)
 MAX_TAILORED_PER_RUN = _cfg.get("max_tailored_per_run", 15)
 # Application packets (form answers for autofilling) are off since 2026-10-04: Haatim fills
 # forms with each site's own autofill and the tailored resume. The code is kept.
