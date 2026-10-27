@@ -169,46 +169,70 @@ def count_lines(pdf_path):
         return None
 
 
+def kb_skill_list():
+    try:
+        groups = (load_kb() or {}).get("skills") or {}
+    except (OSError, yaml.YAMLError):
+        return []
+    return [x for k, v in groups.items() if k != "soft" and isinstance(v, list) for x in v if isinstance(x, str)]
+
+
 def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_description=""):
     """
-    Tailor the baseline resume (ResumeTemplate.tex) with small validated edits only.
+    Tailor the baseline resume (ResumeTemplate.tex) for one job, keeping its exact layout.
+    Claude picks each section's bullets from the defaults plus the approved alternates in
+    bullet_bank.yaml, rewords them toward the job, and reorders projects, coursework and skills.
+    Everything is validated in code and every changed bullet is fact-checked.
     Layout guard: the result must stay on one page and use no more text lines than the
-    untouched baseline; otherwise the edits that grew the most are reverted one by one.
+    untouched baseline; otherwise rewordings, then alternates, then the skills are reverted.
     """
     with open(RESUME_TEMPLATE, "r", encoding="utf-8") as f:
         template = f.read()
-    originals = resume_tailor.extract_sections(template)
+    defaults = resume_tailor.extract_sections(template)
+    bank, slots, skill_extras = resume_tailor.load_bank(defaults)
+    projects = [n for n, _ in resume_tailor.extract_projects(template)]
+    coursework = resume_tailor.extract_coursework(template)
+    base_skills = resume_tailor.extract_skills(template)
+    inventory = resume_tailor.skill_inventory(base_skills, kb_skill_list(), skill_extras)
 
     baseline_pdf = compile_pdf(template, f"_baseline_{slug}", output_dir)
     baseline_lines = count_lines(baseline_pdf)
     if baseline_pdf and os.path.exists(baseline_pdf):
         os.remove(baseline_pdf)
 
-    edits = {}
-    edit_schema = obj({m: arr(obj({"id": {"type": "string", "enum": [f"{m}-{i}" for i in range(len(b))]},
-                                   "text": STR}))
-                       for m, b in originals.items()})
-    edit_prompt = resume_tailor.build_prompt(originals, analysis, custom_prompt, job_description)
-    min_changed = resume_tailor.rewrite_target(sum(len(b) for b in originals.values()))[0]
+    edit_schema = obj({
+        "bullets": obj({m: arr(obj({"id": {"type": "string", "enum": [f"{m}-{i}" for i in range(len(b))]},
+                                    "text": STR}))
+                        for m, b in bank.items()}),
+        "project_order": arr({"type": "string", "enum": projects}),
+        "coursework_order": arr({"type": "string", "enum": coursework}),
+        "skills": arr(obj({"label": STR, "items": arr(STR)})),
+    })
+    edit_prompt = resume_tailor.build_prompt(bank, analysis, custom_prompt, job_description, slots=slots,
+                                             projects=projects, coursework=coursework,
+                                             skills=base_skills, inventory=inventory)
+    min_changed = resume_tailor.rewrite_target(sum(slots.values()))[0]
+    reply = {}
     try:
-        edits = ask_json(client, edit_prompt, edit_schema, max_tokens=16000, temperature=0.3,
+        reply = ask_json(client, edit_prompt, edit_schema, max_tokens=16000, temperature=0.3,
                          effort=EFFORT["edits"], label="resume edits")
-        changed = resume_tailor.count_reworded(originals, edits)
-        logging.info(f"Resume edit pass: {changed} bullet(s) reworded")
+        changed = resume_tailor.count_reworded(bank, reply.get("bullets", {}), slots)
+        logging.info(f"Resume edit pass: {changed} bullet(s) changed")
         if changed < min_changed:
             # Claude sometimes returns the bullets untouched; ask once more so every role gets tailored
-            retry = ask_json(client, edit_prompt + resume_tailor.build_retry_note(changed, originals),
+            retry = ask_json(client, edit_prompt + resume_tailor.build_retry_note(changed, bank, slots),
                              edit_schema, max_tokens=16000, temperature=0.5,
                              effort=EFFORT["edits"], label="resume edits (retry)")
-            retry_changed = resume_tailor.count_reworded(originals, retry)
-            logging.info(f"Resume edit retry: {retry_changed} bullet(s) reworded")
+            retry_changed = resume_tailor.count_reworded(bank, retry.get("bullets", {}), slots)
+            logging.info(f"Resume edit retry: {retry_changed} bullet(s) changed")
             if retry_changed > changed:
-                edits = retry
+                reply = retry
     except Exception as e:
         logging.warning(f"Resume edit pass failed, using baseline resume: {e}")
+    edits = reply.get("bullets", {}) if isinstance(reply, dict) else {}
 
-    # Independent truthfulness check on every changed bullet
-    pairs = resume_tailor.changed_pairs(originals, edits)
+    # Independent truthfulness check on every reworded bullet (alternates as written are pre-approved)
+    pairs = resume_tailor.changed_pairs(bank, edits)
     rejected = []
     if pairs:
         try:
@@ -217,16 +241,33 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
                                max_tokens=16000, temperature=0, effort=EFFORT["verify"], label="fact-check")
             rejected = [r for r in verdict.get("rejected", []) if isinstance(r, dict)]
         except Exception as e:
-            # If the check can't run, don't trust the edits: fall back to the baseline wording
+            # If the check can't run, don't trust the edits: fall back to the bank wording
             logging.warning(f"Truthfulness check failed, keeping original wording: {e}")
             rejected = [{"id": i, "reason": "check unavailable"} for i, _, _ in pairs]
-        edits = resume_tailor.drop_rejected(originals, edits, {r.get("id") for r in rejected})
+        edits = resume_tailor.drop_rejected(bank, edits, {r.get("id") for r in rejected})
 
-    result, sources, changes = resume_tailor.apply_edits(originals, edits)
+    result, sources, changes = resume_tailor.apply_edits(bank, edits, slots)
     changes += [{"id": r.get("id"), "status": "rejected (fact-check)", "reason": r.get("reason")} for r in rejected]
 
-    for attempt in range(13):
+    skills = reply.get("skills") if isinstance(reply, dict) else None
+    skills, trimmed = resume_tailor.fit_skills(skills)
+    if trimmed:
+        changes.append({"section": "SKILLS", "status": "trimmed to fit", "dropped": trimmed})
+    reason = resume_tailor.validate_skills(skills, inventory, base_skills) if skills else "not proposed"
+    if reason:
+        changes.append({"section": "SKILLS", "status": "kept default", "reason": reason})
+        skills = None
+    else:
+        changes.append({"section": "SKILLS", "status": "regrouped"})
+
+    def build():
         tex = resume_tailor.render(template, result)
+        tex = resume_tailor.render_projects(tex, reply.get("project_order") if isinstance(reply, dict) else None)
+        tex = resume_tailor.render_coursework(tex, reply.get("coursework_order") if isinstance(reply, dict) else None)
+        return resume_tailor.render_skills(tex, skills, inventory) if skills else tex
+
+    for attempt in range(25):
+        tex = build()
         pdf = compile_pdf(tex, f"Resume_{slug}", output_dir)
         if pdf is None:
             return None, tex, changes
@@ -236,9 +277,16 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
         if fits:
             break
         logging.info(f"Resume layout guard: {pages} page(s), {lines} lines vs baseline {baseline_lines}")
-        if not resume_tailor.revert_one(result, sources, originals, changes):
-            logging.warning("Layout guard: no edits left to revert")
-            break
+        if resume_tailor.revert_one(result, sources, bank, changes):
+            continue
+        if resume_tailor.revert_alternate(result, sources, bank, slots, changes):
+            continue
+        if skills:
+            skills = None
+            changes.append({"section": "SKILLS", "status": "reverted (layout)"})
+            continue
+        logging.warning("Layout guard: no edits left to revert")
+        break
 
     for c in changes:
         logging.info(f"Resume edit: {c}")

@@ -1,8 +1,8 @@
 % Haatim Ali Resume — template for tailor.py
 % Compatible with Overleaf (pdflatex) — one page
 % This file IS the baseline resume: it must match Haatim's own resume exactly (v7).
-% tailor.py only makes validated wording edits / reorders to the bullets between %%X_START%% / %%X_END%% markers;
-% everything else (header, education, camp instructor, technical skills) is never changed.
+% tailor.py may, between the %%X_START%% / %%X_END%% markers only: pick and reword bullets (from these and
+% bullet_bank.yaml), reorder projects and coursework, and regroup the real skills. Everything else is fixed.
 
 \documentclass[letterpaper,10pt]{article}
 \usepackage[T1]{fontenc}
@@ -78,7 +78,9 @@ Fremont, CA $\cdot$ (510) 468-7997 $\cdot$ haatimta@gmail.com $\cdot$ \href{http
 
 \ressubheading{University of California, Santa Cruz}{Santa Cruz, CA}{Bachelor of Science in Computer Science}{Expected March 2028}
 \begin{itemize}
+% %%COURSEWORK_START%%
     \resitem{\textbf{Relevant Coursework:} Python Programming, C++ Programming, Computer Programming in C, Computer Systems \& Assembly Language, Discrete Mathematics, Linear Algebra, Calculus I--II, Statistics}
+% %%COURSEWORK_END%%
     \resitem{\textbf{Leadership:} Alpha Kappa Psi --- Historian; Professional Development \& Tech Committee}
 \end{itemize}
 
@@ -114,6 +116,7 @@ Fremont, CA $\cdot$ (510) 468-7997 $\cdot$ haatimta@gmail.com $\cdot$ \href{http
 \resheading{Projects}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% %%PROJECTS_START%%
 \ressubheading{JobAgent --- Autonomous Internship Search \& Resume Tailoring Pipeline}{\href{https://github.com/Haatim-Ali/job-agent-v2}{github.com/Haatim-Ali/job-agent-v2}}{Personal project, built out from a 2-person prototype}{March 2026 -- Present}
 \begin{itemize}
 % %%JOBAGENT_BULLETS_START%%
@@ -142,16 +145,19 @@ Fremont, CA $\cdot$ (510) 468-7997 $\cdot$ haatimta@gmail.com $\cdot$ \href{http
     \resitem{Visualized payoff timelines, surplus allocation, and net worth trajectory in a Flask + Chart.js demo shipped in 24 hours}
 % %%PATHWISE_BULLETS_END%%
 \end{itemize}
+% %%PROJECTS_END%%
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \resheading{Technical Skills}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 \vspace{-6pt}
 \begin{itemize}
+% %%SKILLS_START%%
     \resitem{\textbf{Languages:} Python, Java, C++, C, JavaScript/TypeScript, SQL, HTML/CSS, Assembly}
     \resitem{\textbf{Frameworks \& Libraries:} PyTorch, Stable Baselines3, Flask, Next.js, Chart.js, jQuery, Bootstrap}
     \resitem{\textbf{Cloud, Data \& DevOps:} Kubernetes, Linux, Git, GitHub Actions (CI/CD), PostgreSQL, SQLite, REST APIs, pytest}
     \resitem{\textbf{AI/ML:} Claude API, NVIDIA NIM, Multi-Agent Systems, LLM Evaluation, Reinforcement Learning, CNNs}
+% %%SKILLS_END%%
 \end{itemize}
 
 \end{document}

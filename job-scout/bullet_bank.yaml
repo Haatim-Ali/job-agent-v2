@@ -1,0 +1,48 @@
+# Approved alternate resume bullets, all checked against the real work (repos, logs, PRs).
+# ResumeTemplate.tex holds the default bullets for each section; tailoring may swap in any of
+# these instead when they fit a job better, keeping the same number of bullets per section.
+# Text uses **bold** markers like the tailor prompt (none are bolded today). Keep the result-first
+# style and roughly the length of the defaults (the page is full). Add only verified facts.
+
+MONTESSORI_BULLETS:
+  # Server logs, Mar 15 - Apr 14 2024 (bots filtered): 1,580 page views, 883 unique IPs
+  - "Drew 1,500+ page views a month from 880+ visitors, with Google search as the top referrer, tracked in Google Analytics"
+
+UPLINK_BULLETS:
+  # saraxjain/uplink: 10 of the 13 merged PRs are Haatim's (#1-4, 6-8, 10, 12, 13)
+  - "Shipped 10 of the team's 13 merged pull requests, including the A2A agent runtime, the evaluation, photo accuracy, and the customer site"
+  # PR #2
+  - "Read donation photos with an open vision model (Qwen2.5-VL-7B) on an NVIDIA Brev L4 GPU, with code turning its counts into servings and weight"
+  # PRs #4, #8, #13
+  - "Built a customer site and a behind-the-scenes ops dashboard in JavaScript where users schedule pickups and follow each dispatch stage on a live map"
+  # PR #3 (safer human-timeout fallback); red lines and human escalation are in the agents
+  - "Hardened the agents' human escalation for red-line vetoes and deadlocks with a safer fallback when no person answers in time"
+
+JOBAGENT_BULLETS:
+  - "Kept every tailored resume truthful with an LLM pipeline that rewrites bullets toward each posting, plus code checks and an independent fact-check that reject unsupported claims"
+  - "Fit every tailored resume on one page with a layout guard that recompiles it and reverts the largest edits until it fits"
+  # jobs.db: seen_jobs, applications, rejections, apply_queue, tailored_resumes, learned_boards
+  - "Tracked every job, application, rejection, and tailored resume in a 6-table SQLite database, with applications synced to Google Sheets"
+  - "Protected production data with nightly SQLite backups (14 kept) and log rotation, running every service under cron and systemd"
+
+# Skills the tailor may list in Technical Skills besides those already in the template and in
+# experience_kb.yaml. Tailoring can only reorder and regroup real skills, never invent one.
+skill_extras:
+  - Playwright
+  - TensorBoard
+  - SQLite
+  - Google Sheets API
+  - Structured Outputs
+  - Prompt Engineering
+  - Agent Orchestration
+  - LLM Evaluation
+  - Vision-Language Models
+  - Multi-Agent Systems
+  - Database Design
+  - Debugging
+  - Code Review
+  - Testing
+  - GitHub Actions (CI/CD)
+  - REST APIs
+  - Stable Baselines3
+  - NVIDIA Brev

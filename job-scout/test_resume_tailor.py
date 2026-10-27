@@ -202,4 +202,121 @@ def test_prompt_requires_a_rewrite_count():
     assert f"{lo} to {hi} of the" in p
     assert "must look identical after tailoring" not in p
     note = rt.build_retry_note(0, sections)
-    assert "reworded only 0" in note and f"{lo} to {hi}" in note
+    assert "changed only 0" in note and f"{lo} to {hi}" in note
+
+
+# ── Bullet bank, projects, coursework, skills (2026-10-26 rebuild) ───────────
+
+BANK, SLOTS, EXTRAS = rt.load_bank(SECTIONS)
+
+
+def test_bank_puts_defaults_first_and_adds_alternates():
+    for m, defaults in SECTIONS.items():
+        assert BANK[m][:len(defaults)] == defaults and SLOTS[m] == len(defaults)
+    assert len(BANK["UPLINK_BULLETS"]) > SLOTS["UPLINK_BULLETS"]
+    assert len(BANK["JOBAGENT_BULLETS"]) > SLOTS["JOBAGENT_BULLETS"]
+    assert "Playwright" in EXTRAS
+
+
+def test_bank_bullets_have_no_em_dash_or_bold():
+    for m, bullets in BANK.items():
+        for b in bullets:
+            assert "**" not in rt.latex_to_marked(b) and "—" not in rt.latex_to_marked(b)
+
+
+def test_alternate_can_replace_a_default_and_is_reported():
+    m = "UPLINK_BULLETS"
+    alt = SLOTS[m]          # first alternate
+    pick = [alt, 0, 1, 2]
+    edits = {m: [{"id": f"{m}-{i}", "text": rt.latex_to_marked(BANK[m][i])} for i in pick]}
+    result, sources, changes = rt.apply_edits(BANK, edits, SLOTS)
+    assert result[m][0] == BANK[m][alt] and len(result[m]) == SLOTS[m]
+    assert {"id": f"{m}-{alt}", "status": "alternate"} in changes
+    assert rt.count_reworded(BANK, edits, SLOTS) == 1
+
+
+def test_wrong_number_of_picks_keeps_defaults():
+    m = "UPLINK_BULLETS"
+    edits = {m: [{"id": f"{m}-{i}", "text": rt.latex_to_marked(BANK[m][i])} for i in range(5)]}
+    result, _, changes = rt.apply_edits(BANK, edits, SLOTS)
+    assert result[m] == SECTIONS[m]
+    assert any(c.get("status") == "ignored reorder" for c in changes)
+
+
+def test_revert_alternate_swaps_back_an_unused_default():
+    m = "JOBAGENT_BULLETS"
+    alt = SLOTS[m] + 1
+    edits = {m: [{"id": f"{m}-{i}", "text": rt.latex_to_marked(BANK[m][i])} for i in (0, alt, 1, 2)]}
+    result, sources, changes = rt.apply_edits(BANK, edits, SLOTS)
+    assert rt.revert_alternate(result, sources, BANK, SLOTS, changes)
+    assert result[m][1] == BANK[m][3] and sources[m][1] == f"{m}-3"
+    assert not rt.revert_alternate(result, sources, BANK, SLOTS, changes)
+
+
+def test_no_edits_with_bank_reproduces_template_exactly():
+    result, _, _ = rt.apply_edits(BANK, {}, SLOTS)
+    assert rt.render(TEMPLATE, result) == TEMPLATE
+
+
+def test_project_order_renders_and_round_trips():
+    names = [n for n, _ in rt.extract_projects(TEMPLATE)]
+    assert names == ["JobAgent", "Uplink", "Pathwise"]
+    assert rt.render_projects(TEMPLATE, names) == TEMPLATE
+    moved = rt.render_projects(TEMPLATE, ["Pathwise", "Uplink", "JobAgent"])
+    assert moved.index("{Pathwise") < moved.index("{Uplink") < moved.index("{JobAgent")
+    assert rt.render_projects(moved, names) == TEMPLATE
+    assert rt.render_projects(TEMPLATE, ["Uplink", "Uplink", "JobAgent"]) == TEMPLATE   # not a permutation
+
+
+def test_coursework_reorders_only_as_a_permutation():
+    c = rt.extract_coursework(TEMPLATE)
+    assert "Computer Systems & Assembly Language" in c
+    assert rt.render_coursework(TEMPLATE, c) == TEMPLATE
+    out = rt.render_coursework(TEMPLATE, c[::-1])
+    assert "Coursework:} Statistics, Calculus I--II" in out and "Systems \\& Assembly" in out
+    assert rt.render_coursework(TEMPLATE, c[:-1]) == TEMPLATE                            # dropped one
+
+
+def test_skills_round_trip_and_validation():
+    sk = rt.extract_skills(TEMPLATE)
+    inv = rt.skill_inventory(sk, ["TensorBoard"], EXTRAS)
+    assert rt.render_skills(TEMPLATE, sk) == TEMPLATE
+    assert rt.validate_skills(sk, inv, sk) is None
+    bad = [dict(l) for l in sk]
+    bad[0] = {"label": "Languages", "items": sk[0]["items"] + ["Rust"]}
+    assert "unknown skill" in rt.validate_skills(bad, inv, sk)
+    dup = [dict(l) for l in sk]
+    dup[1] = {"label": dup[1]["label"], "items": dup[1]["items"] + ["Python"]}
+    assert "duplicate" in rt.validate_skills(dup, inv, sk)
+    assert "3 or 4" in rt.validate_skills(sk[:2], inv, sk)
+    thin = [{"label": "A", "items": ["Python"]}, {"label": "B", "items": ["C"]}, {"label": "C", "items": ["Git"]}]
+    assert "dropped too many" in rt.validate_skills(thin, inv, sk)
+    systems = ["Linux", "Git", "Kubernetes", "SQLite", "PostgreSQL", "REST APIs", "pytest", "GitHub Actions (CI/CD)"]
+    regrouped = [{"label": "Languages", "items": ["C", "C++", "Assembly", "Python", "Java", "JavaScript/TypeScript", "SQL", "HTML/CSS"]},
+                 {"label": "Systems & Tools", "items": systems}, sk[1], sk[3]]
+    assert rt.validate_skills(regrouped, inv, sk) is None
+    out = rt.render_skills(TEMPLATE, regrouped, inv)
+    assert "\\textbf{Languages:} C, C++, Assembly, Python" in out
+    assert "\\textbf{Systems \\& Tools:} Linux, Git, Kubernetes" in out
+
+
+def test_prompt_lists_alternates_projects_and_skill_inventory():
+    sk = rt.extract_skills(TEMPLATE)
+    inv = rt.skill_inventory(sk, [], EXTRAS)
+    p = rt.build_prompt(BANK, {"role_title": "R", "company": "C"}, slots=SLOTS,
+                        projects=["JobAgent", "Uplink", "Pathwise"],
+                        coursework=rt.extract_coursework(TEMPLATE), skills=sk, inventory=inv)
+    assert "// alternate" in p and "pick exactly 4" in p
+    assert "project_order" in p and "coursework_order" in p and "Playwright" in p
+
+
+def test_fit_skills_trims_the_tail_of_overlong_lines():
+    long_line = {"label": "Systems, Tools & DevOps", "items": ["Linux", "Git", "Kubernetes", "GitHub Actions (CI/CD)",
+                 "PostgreSQL", "SQLite", "REST APIs", "pytest", "Playwright", "TensorBoard", "Google Sheets API"]}
+    ok = {"label": "Languages", "items": ["C", "C++"]}
+    lines, dropped = rt.fit_skills([long_line, ok])
+    assert lines[1] == ok and dropped and dropped[0] == "Google Sheets API"
+    l0 = lines[0]
+    assert len(l0["label"]) + 2 + len(", ".join(l0["items"])) <= rt.SKILL_LINE_MAX
+    assert l0["items"][:3] == ["Linux", "Git", "Kubernetes"]
+    assert rt.fit_skills(None) == (None, [])
