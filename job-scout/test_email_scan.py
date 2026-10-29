@@ -131,3 +131,14 @@ def test_prompt_and_query_cover_the_cases():
     p = es.classify_prompt({"from": "a", "subject": "b", "date": "c", "body": "x" * 5000})
     assert "When unsure, use other" in p and len(p) < 5000
     assert "unfortunately" in es.QUERY and "myworkday.com" in es.QUERY
+
+
+def test_campus_senders_are_never_applications(tmp_path, fake_claude):
+    # Regression: Alpha Kappa Psi rush "interviews" from classmates became tracker rows.
+    apps = FakeWorksheet(ss.APPS_TAB, [HEADER])
+    fake_claude["a"] = {"kind": "interview", "company": "The Gym", "role": "", "summary": "Interview Fri"}
+    conn = es.db_conn(str(tmp_path / "jobs.db"))
+    gmail = FakeGmail([_msg("a", "Interview @ The Gym", "x", sender="Rishab <rrvemula@ucsc.edu>")])
+    assert es.scan(client=object(), sess=gmail, sheet=FakeSheet(apps), conn=conn) == []
+    assert len(apps.rows) == 1
+    assert "-from:ucsc.edu" in es.QUERY and "-from:me" in es.QUERY

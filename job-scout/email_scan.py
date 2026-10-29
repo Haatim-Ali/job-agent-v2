@@ -41,7 +41,10 @@ ATS_SENDERS = ["myworkday.com", "myworkdayjobs.com", "greenhouse.io", "greenhous
                "avature.net", "oraclecloud.com", "bamboohr.com", "rippling.com", "deel.com"]
 QUERY = ("(from:(" + " OR ".join(ATS_SENDERS) + ") OR subject:(application OR applying OR interview OR "
          "assessment OR candidacy OR \"next steps\" OR internship OR intern) OR unfortunately) "
-         "-category:promotions -category:social")
+         "-category:promotions -category:social -from:me -from:ucsc.edu")
+# Classmates, clubs (fraternity rush "interviews"), professors and campus offices all write from
+# @ucsc.edu; companies don't. The query already excludes them; this catches forwarded copies.
+SKIP_SENDER = re.compile(r"@(?:[\w-]+\.)*ucsc\.edu\b", re.I)
 
 KINDS = ["rejection", "assessment", "interview", "offer", "confirmation", "other"]
 KIND_STATUS = {"rejection": "rejected", "assessment": "assessment", "interview": "interview",
@@ -132,7 +135,8 @@ kind:
 - offer: a job offer
 - confirmation: confirms an application he submitted ("we received your application")
 - other: anything else (job alerts, newsletters, recommendations, reminders to finish an application,
-  account emails, career fairs, marketing). When unsure, use other.
+  account emails, career fairs, marketing, and anything from a club, fraternity, student organization,
+  class or classmate, even if it says "interview"). When unsure, use other.
 
 company: the hiring company's usual name (e.g. "NVIDIA", not "NVIDIA Corporation via Workday"); "" if none.
 role: the exact position title if the email names it, else "".
@@ -209,6 +213,8 @@ def scan(client=None, sess=None, sheet=None, conn=None, dry=False):
         except Exception as e:  # not saved, so it is retried next run
             logging.warning(f"Inbox check: skipped message {msg_id}: {e}")
             continue
+        if SKIP_SENDER.search(email["from"]):
+            c = {**c, "kind": "other"}
         status = KIND_STATUS.get(c["kind"])
         if not status or not c["company"]:
             result = "ignored"
