@@ -54,6 +54,7 @@ flowchart TB
 | `resume_tailor.py` | The rules that keep resume edits truthful and the layout identical | Imported by `tailor.py` | VPS |
 | `apply_prep.py` | Application queue, packet builder, #applications notices | Started by the scraper at the end of each run; also a command-line tool | VPS |
 | `sheets_sync.py` | Writes applications into the Google Sheet tracker | Imported by the bot and `apply_prep.py` | VPS |
+| `email_scan.py` | Reads htali@ucsc.edu (read-only) and updates the tracker from rejections, assessments and interviews | cron twice a day, `!inbox` | VPS |
 | `jobs.db` | SQLite database file shared by everything above | A single file | VPS |
 | `/submit-applications` | Claude Code skill that fills forms in Chrome | You run it on your Mac ("submit my queue") | Mac, `~/.claude/skills/` |
 | Google Sheet | Your personal application tracker | Google's servers | Google Drive |
@@ -783,11 +784,29 @@ Column I gets `=HYPERLINK("https://discord.com/channels/…", "Tailored ↗")`, 
 
 ### Rejections from email
 
-Gmail is not connected to the VPS. Rejections, assessments and expiries were read from Gmail (haatimta@gmail.com) by Claude Code on request and written into the sheet. Applications since 2026-09-30 use htali@ucsc.edu, whose inbox nobody reads automatically.
+`email_scan.py` (below) reads htali@ucsc.edu and writes rejections, assessments, interviews, offers and missing applications into Applications through `record_email`. Before it existed, rejections were read from haatimta@gmail.com by Claude Code on request.
 
 ### Fail soft
 
 `record_safe` wraps every sync. A Google outage or a permissions problem is logged as a warning and returns nothing; the bot keeps working.
+
+## Gmail inbox check (`email_scan.py`)
+
+Since 2026-09-30 every application uses **htali@ucsc.edu**, so that inbox is where companies answer. `email_scan.py` reads it twice a day and keeps the tracker current.
+
+**Access.** The **Gmail API** with the **`gmail.readonly` scope**: the code can list and read messages, nothing else (it can't send, delete, label or move mail). Sign-in uses **OAuth 2.0 for installed apps**: an OAuth client ("Desktop app") in the same Google Cloud project as the Sheets service account, and a one-time browser sign-in as htali@ucsc.edu on the Mac (`python email_scan.py --auth <client.json>`). That saves a **refresh token** (a long-lived key that gets fresh short-lived access tokens) in `gmail_token.json`, which is git-ignored and copied to the VPS. A service account can't be used here: reading a person's Gmail with one needs a Workspace admin (domain-wide delegation).
+
+**One run:**
+
+1. List messages matching a broad query: mail from applicant-tracking systems (Workday, Greenhouse, Ashby, Lever, SmartRecruiters, iCIMS, Jobvite, CodeSignal, HackerRank, Wellfound and more), subjects with "application", "interview", "assessment" and the like, or the word "unfortunately". The first run reads back to 2026-08-01; later runs read the last 4 days.
+2. Skip any message already in the `email_events` table, so each email is handled once.
+3. Claude Haiku (temperature 0, structured output) labels each one: rejection, assessment, interview, offer, confirmation or other, plus company, role and a 12-word summary. Anything that isn't clearly about an application is "other" and ignored.
+4. `sheets_sync.record_email` finds the row: same company (tolerating suffixes such as "Inc." and longer names), then the closest role by text similarity when the company has several. If the email doesn't say which of several roles it is about, nothing is written and the summary asks Haatim. A row only moves forward (`STATUS_RANK`): a late "we received your application" never undoes a rejection, and only an offer beats a rejection. An email about an untracked application adds a row with Source "Email".
+5. One summary in #reactions listing what changed. It pings Haatim for assessments, interviews, offers and questions.
+
+If the sign-in expires or is revoked, the run posts a warning in #reactions with the command to sign in again. `!inbox` in Discord runs a check immediately.
+
+**Cron:** 15:05 and 01:05 UTC (about 8 am and 6 pm Pacific), log `/var/log/jobscout_email.log`.
 
 ## Discord
 
@@ -1017,6 +1036,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-29: inbox check for htali@ucsc.edu.** New `email_scan.py`: read-only Gmail API access, Claude Haiku labels each recruiting email, `sheets_sync.record_email` updates the matching Applications row (never backwards; asks when several roles could match), summary in #reactions, `!inbox` command, cron twice a day. 15 tests added.
 
 **2026-10-29: tracker sheet redesigned.** New Dashboard, Applications (one row per position, status chips, dates, source, links) and Targets tabs; the old Product tab is hidden as "Product (old)", other tabs untouched. `sheets_sync.py` now writes only to Applications, matches postings by host + path, names "Unknown Company" rows from the link, records Applied/Updated dates, and sorts newest first. Data moved over: 82 applications; one duplicate NVIDIA row dropped and two KLA rows for the same req merged. From Gmail: 4 AMD applications, Architexor and GAO Tek (Wellfound, expired), ByteDance AI Platform (assessment invite 10/5) and TikTok (CodeSignal invite expired 10/10). New statuses `assessment` and `closed` in `!status`. Tests rewritten for the new layout.
 

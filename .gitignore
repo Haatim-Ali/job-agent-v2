@@ -27,3 +27,6 @@ job-scout/*.log
 job-scout/.env*
 !job-scout/.env.example
 *.log.*
+# Gmail sign-in for email_scan.py (OAuth client + refresh token)
+job-scout/gmail_*.json
+job-scout/*client_secret*.json

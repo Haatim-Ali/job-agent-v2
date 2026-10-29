@@ -62,3 +62,9 @@ def test_alerts_are_not_auto_tailored_by_default():
     import json, os
     cfg = json.load(open(os.path.join(os.path.dirname(__file__), "scraper_config.json")))
     assert cfg["tailor_every_alert"] is False
+
+
+def test_help_lists_inbox_command():
+    bot = pytest.importorskip("bot")
+    assert "!inbox" in bot.HELP_TEXT
+    assert "assessment" in bot.STATUSES and "closed" in bot.STATUSES

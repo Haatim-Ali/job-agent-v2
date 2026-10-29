@@ -5,6 +5,7 @@ Watches for reactions on job alert messages and triggers tailoring
 """
 
 import os
+import sys
 import asyncio
 import subprocess
 import logging
@@ -77,7 +78,8 @@ STATUS_EMOJI = {
 
 HELP_TEXT = """**Job Scout Commands:**
 `!applied <job_url> <Company> - <Role>` — log a new application
-`!status <job_url> <status>` — update status (phone_screen, interview, offer, rejected, withdrawn)
+`!status <job_url> <status>` — update status (assessment, phone_screen, interview, offer, rejected, closed, withdrawn)
+`!inbox` — check htali@ucsc.edu now for rejections, assessments and interviews (also runs twice a day)
 `!tracker` — show your full application pipeline
 `!stats` — show application stats + rejection patterns
 `!note <job_url> <note>` — add a note to an application
@@ -614,6 +616,16 @@ async def on_message(message):
         await message.channel.send(
             f"<@{message.author.id}> Logged! ✅ **{title.strip()}** at **{company.strip()}**"
         )
+
+    elif cmd == "!inbox":
+        await message.channel.send("📬 Checking htali@ucsc.edu…")
+        script = os.path.join(os.path.dirname(os.path.abspath(__file__)), "email_scan.py")
+        result = await asyncio.get_running_loop().run_in_executor(
+            None, lambda: subprocess.run([sys.executable, script], capture_output=True, text=True, timeout=600))
+        done = "done" if result.returncode == 0 else "failed, see /var/log/jobscout_email.log"
+        await message.channel.send(f"Inbox check {done}. Anything new is posted in <#{reply_channel_id(message.channel.id)}>.")
+        if result.returncode != 0:
+            logging.error(f"email_scan failed: {result.stderr[-2000:]}")
 
     elif cmd == "!status":
         if len(parts) < 3:

@@ -198,6 +198,66 @@ def record(company, title, url, status, notes="", sheet=None, resume=None, sourc
     return f"{APPS_TAB}: added {company} — {title} ({label}{extra})"
 
 
+# How far along each status is; an email only moves a row forward (a late "we received your
+# application" never undoes a rejection). Rejected/Closed/Withdrawn end it; only an offer beats them.
+STATUS_RANK = {"": 0, "To Apply": 0, "Applied": 1, "Assessment": 2, "Interviewing": 3,
+               "Rejected": 4, "Closed": 4, "Withdrawn": 4, "Offer": 5}
+
+
+def same_company(a, b):
+    a, b = normalize_company(a), normalize_company(b)
+    return bool(a and b) and (a == b or a.startswith(b + " ") or b.startswith(a + " "))
+
+
+def role_score(a, b):
+    from difflib import SequenceMatcher
+    a, b = normalize_title(a), normalize_title(b)
+    return SequenceMatcher(None, a, b).ratio() if a and b else 0.0
+
+
+def pick_row(rows, company, role):
+    """(row number, None) for the row an email is about, or (None, reason) when it can't be told
+    apart from the company's other roles. (None, None) when the company isn't in the sheet."""
+    cands = [i for i, r in enumerate(rows[1:], start=2) if r and same_company(r[0], company)]
+    if not cands:
+        return None, None
+    scored = sorted(((role_score(rows[i - 1][1], role), i) for i in cands), reverse=True)
+    best, row = scored[0]
+    if len(cands) == 1 and (not role or best >= 0.4):
+        return row, None
+    if best >= 0.75 and (len(scored) == 1 or best - scored[1][0] >= 0.1):
+        return row, None
+    if len(cands) == 1:
+        return None, None  # a different role at a company with one tracked application
+    return None, f"{len(cands)} roles at {rows[cands[0] - 1][0]} in the sheet"
+
+
+def record_email(company, role, status, when, note, sheet=None):
+    """Apply what an email says to the Applications tab. Returns what happened:
+    a description, "unchanged", or "ambiguous: <why>" (nothing written; Haatim decides)."""
+    if sheet is None:
+        sheet = _open_sheet()
+    ws = _apps_tab(sheet)
+    rows = [r + [""] * (len(HEADER) - len(r)) for r in ws.get_all_values(value_render_option="FORMULA")]
+    label = STATUS_LABELS.get(status, status.title())
+    row, why = pick_row(rows, company, role)
+    if why:
+        return f"ambiguous: {why}"
+    if row is not None:
+        current = rows[row - 1]
+        if STATUS_RANK.get(label, 0) <= STATUS_RANK.get(current[2], 0):
+            return "unchanged"
+        notes = f"{current[9]}; {note}" if current[9] else note
+        ws.update(range_name=f"C{row}:E{row}", values=[[label, current[3] or (when if status == "applied" else ""), when]],
+                  value_input_option="USER_ENTERED")
+        ws.update(range_name=f"J{row}", values=[[notes]])
+        return f"{current[0]} — {current[1]}: {current[2] or 'blank'} → {label}"
+    ws.append_row([company, role or "Role not named in email", label, when if status == "applied" else "", when,
+                   "Email", "", "", "", note], value_input_option="USER_ENTERED", table_range="A1")
+    ws.sort((4, "des"), (5, "des"), range=f"A2:J{len(rows) + 1}")
+    return f"added {company} ({label}) from email"
+
+
 def record_safe(*args, **kwargs):
     """record() that logs instead of raising, for use from the Discord bot."""
     try:

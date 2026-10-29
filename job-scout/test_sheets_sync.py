@@ -197,3 +197,63 @@ def test_dashboard_formulas_use_open_ranges_on_applications():
     assert cells["D12"].startswith("=SPARKLINE(C12") and STATUS_BLUE in cells["D12"]
     # every status in the dropdown has a chip colour
     assert set(ss.STATUS_ORDER) == set(ss.STATUS_COLORS)
+
+
+# ── Emails → sheet (record_email) ─────────────────────────────────────────────
+
+def _email_sheet():
+    apps = FakeWorksheet(ss.APPS_TAB, [
+        HEADER,
+        _row("NVIDIA", "NVIDIA 2027 Internships: Deep Learning"),
+        _row("NVIDIA", "2027 Systems Software Engineering Intern"),
+        _row("Stripe", "SWE Intern"),
+        _row("IBM", "Consultant Intern", status="Rejected"),
+    ])
+    return FakeSheet(apps), apps
+
+
+def test_email_rejection_updates_the_only_role_at_a_company():
+    sheet, apps = _email_sheet()
+    msg = ss.record_email("Stripe, Inc.", "", "rejected", "11/2/2026", "Rejection email 11/2/2026: not moving forward",
+                          sheet=sheet)
+    assert apps.rows[3][2:5] == ["Rejected", "10/1/2026", "11/2/2026"]
+    assert apps.rows[3][9] == "Rejection email 11/2/2026: not moving forward"
+    assert "Applied → Rejected" in msg
+
+
+def test_email_picks_the_matching_role_among_several():
+    sheet, apps = _email_sheet()
+    ss.record_email("NVIDIA", "Systems Software Engineering Intern 2027", "assessment", "11/2/2026", "OA", sheet=sheet)
+    assert apps.rows[2][2] == "Assessment"
+    assert apps.rows[1][2] == "Applied"
+
+
+def test_email_without_role_at_multi_role_company_is_left_to_haatim():
+    sheet, apps = _email_sheet()
+    msg = ss.record_email("NVIDIA", "", "rejected", "11/2/2026", "x", sheet=sheet)
+    assert msg == "ambiguous: 2 roles at NVIDIA in the sheet"
+    assert [r[2] for r in apps.rows[1:3]] == ["Applied", "Applied"]
+
+
+def test_email_never_moves_a_row_backwards():
+    sheet, apps = _email_sheet()
+    assert ss.record_email("IBM", "Consultant Intern", "applied", "11/2/2026", "x", sheet=sheet) == "unchanged"
+    assert apps.rows[4][2] == "Rejected"
+    # an offer still beats a rejection
+    ss.record_email("IBM", "Consultant Intern", "offer", "11/3/2026", "y", sheet=sheet)
+    assert apps.rows[4][2] == "Offer"
+
+
+def test_email_for_untracked_application_adds_a_row():
+    sheet, apps = _email_sheet()
+    msg = ss.record_email("AMD", "Software Engineer Intern/Co-op", "applied", "9/28/2026", "Confirmation", sheet=sheet)
+    assert apps.rows[-1][:6] == ["AMD", "Software Engineer Intern/Co-op", "Applied", "9/28/2026", "9/28/2026", "Email"]
+    assert apps.sorted and "added AMD" in msg
+    ss.record_email("Glean", "", "rejected", "11/2/2026", "x", sheet=sheet)
+    assert apps.rows[-1][1:4] == ["Role not named in email", "Rejected", ""]
+
+
+def test_same_company_tolerates_suffixes_and_longer_names():
+    assert ss.same_company("Rivian and Volkswagen Group Technologies", "Rivian and Volkswagen Group")
+    assert ss.same_company("Niantic Spatial, Inc.", "Niantic Spatial")
+    assert not ss.same_company("HP", "HPE")
