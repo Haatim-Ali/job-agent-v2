@@ -756,6 +756,7 @@ Settings are read **when a sync runs, not when the module is imported**. That fi
 |---|---|
 | **Dashboard** | Totals (applications, companies, in progress, response rate, rejected, offers), a status breakdown with coloured bars, applications per week (table + chart), companies with several roles, and recent activity. Every number is a formula over Applications, so it is always current. |
 | **Applications** | One row per position, newest first: A Company, B Role, C Status (dropdown, coloured chip), D Applied, E Updated, F Source, G Location, H Posting (`Open ↗` link), I Resume (`Tailored ↗` link or "Default"), J Notes, K Roles @ Co. |
+| **Quick Apply** | Copy-ready application details (contact, links, address, education, work authorization, common answers, voluntary self-ID), from `application_answers.yaml`. Typed once by hand; the code never touches it, so edit it freely. |
 | **Targets** | Your hand-made list of companies, with formulas for how many roles you have applied to there and the latest status ("Not yet" in grey). |
 | Consulting, Deferred MBA programs, Oracle, Miscellaneous | Your own lists; the code never touches them. |
 | Product (old) | The previous layout, hidden, kept as a backup. |
