@@ -749,24 +749,41 @@ The code signs in with a Google **service account**: a robot identity with its o
 
 Settings are read **when a sync runs, not when the module is imported**. That fixed a real bug: `bot.py` imported `sheets_sync` before calling `load_dotenv()`, so the settings looked unset forever and syncing silently never happened.
 
-### Sheet layout
+### Sheet layout (since 2026-10-29)
 
-Every tab uses: A = Company, C = Role, D = Contact, F = Link to Posting, G = Job Status, H = Notes, I = Resume Used. Row 1 is the header and row 2 a placeholder. Tabs: Product, Consulting, Deferred MBA programs, Oracle, Miscellaneous.
+| Tab | What it shows |
+|---|---|
+| **Dashboard** | Totals (applications, companies, in progress, response rate, rejected, offers), a status breakdown with coloured bars, applications per week (table + chart), companies with several roles, and recent activity. Every number is a formula over Applications, so it is always current. |
+| **Applications** | One row per position, newest first: A Company, B Role, C Status (dropdown, coloured chip), D Applied, E Updated, F Source, G Location, H Posting (`Open ↗` link), I Resume (`Tailored ↗` link or "Default"), J Notes, K Roles @ Co. |
+| **Targets** | Your hand-made list of companies, with formulas for how many roles you have applied to there and the latest status ("Not yet" in grey). |
+| Consulting, Deferred MBA programs, Oracle, Miscellaneous | Your own lists; the code never touches them. |
+| Product (old) | The previous layout, hidden, kept as a backup. |
+
+Statuses: To Apply, Applied, Assessment, Interviewing, Offer, Rejected, Closed (expired or an assessment never taken), Withdrawn.
+
+**Several roles at one company** are separate rows that share the Company. Column K is one array formula in K1 that counts them, and the Dashboard lists every company with more than one role.
+
+New rows are **appended and then sorted** by Applied date (newest first), not inserted at row 2: inserting at row 2 would shift every formula's `A2:A` reference to `A3:A`.
+
+`python sheets_sync.py --layout` re-applies all formatting (header, banding, chips, dropdown, filter, widths) and rebuilds the Dashboard. It never changes data rows.
 
 ### Where a row goes (`find_row`)
 
-Checked across all tabs, in order:
+Only the Applications tab is searched, in order:
 
-1. A row with the same posting link → update Status only.
-2. Same company and same role → update Status only.
-3. Same company with an empty Role cell (your pre-listed target companies) → fill in Role, Link, Status, Notes.
-4. Otherwise → append a new row to the first tab.
+1. The same posting, compared by host + path (`url_key`), so share links and tracking query strings don't create duplicates → update Status and Updated.
+2. Same company and same role (both normalized) → update Status and Updated.
+3. Otherwise → a new row with today's date (Pacific) in Applied and Updated.
 
-Companies are compared after `normalize_company`, which lowercases and strips suffixes like Inc, LLC, Corp, Technologies, Systems and Labs, so "Adobe Systems" matches "Adobe."
+Logging an application that is already tracked only bumps Updated. An "Unknown Company" is named from the posting link when the host matches a company already in the sheet (`guess_company`: careers.cisco.com → Cisco). Markdown leftovers like `**url**` are stripped. Companies are compared after `normalize_company` (lowercase, no Inc/LLC/Corp/Technologies/Systems/Labs).
 
-### Resume Used
+### Resume
 
-Column I gets a **formula**, `=HYPERLINK("https://discord.com/channels/…", "Haatim_Ali_Figma_Resume.pdf")`, which shows the file name as a clickable link to the Discord message holding that exact PDF. Formulas only work when written with `value_input_option="USER_ENTERED"` (treat it as if a person typed it); the default, `RAW`, would store the formula as literal text. If the job was never tailored, the cell says "General/default resume." Status-only updates leave column I alone, and column D (Contact) is never touched.
+Column I gets `=HYPERLINK("https://discord.com/channels/…", "Tailored ↗")`, a link to the Discord message holding that exact PDF, or "Default" if the job was never tailored. Formulas only work when written with `value_input_option="USER_ENTERED"`. Status-only updates leave column I alone.
+
+### Rejections from email
+
+Gmail is not connected to the VPS. Rejections, assessments and expiries were read from Gmail (haatimta@gmail.com) by Claude Code on request and written into the sheet. Applications since 2026-09-30 use htali@ucsc.edu, whose inbox nobody reads automatically.
 
 ### Fail soft
 
@@ -1000,6 +1017,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-29: tracker sheet redesigned.** New Dashboard, Applications (one row per position, status chips, dates, source, links) and Targets tabs; the old Product tab is hidden as "Product (old)", other tabs untouched. `sheets_sync.py` now writes only to Applications, matches postings by host + path, names "Unknown Company" rows from the link, records Applied/Updated dates, and sorts newest first. Data moved over: 82 applications; one duplicate NVIDIA row dropped and two KLA rows for the same req merged. From Gmail: 4 AMD applications, Architexor and GAO Tek (Wellfound, expired), ByteDance AI Platform (assessment invite 10/5) and TikTok (CodeSignal invite expired 10/10). New statuses `assessment` and `closed` in `!status`. Tests rewritten for the new layout.
 
 **2026-10-26: every reaction answers in #reactions.** A ✅ on a tailored-files message in #requests had its "Logged application" reply posted in #requests; replies to reactions in any channel now go to the actions channel (renamed #reactions in Discord).
 

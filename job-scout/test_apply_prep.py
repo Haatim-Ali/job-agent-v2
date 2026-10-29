@@ -205,18 +205,18 @@ class TestDiscord:
         text = json.loads(posts[0][1]["data"]["payload_json"])["content"]
         assert "Applied:** SWE Intern at Figma" in text and "Haatim_Ali_Figma_Resume.pdf" in text
         assert sheet_calls[0]["resume"] == (
-            '=HYPERLINK("https://discord.com/channels/777/123/999", "Haatim_Ali_Figma_Resume.pdf")')
+            '=HYPERLINK("https://discord.com/channels/777/123/999", "Tailored ↗")')
 
 
 class TestResumeUsed:
     def test_default_when_nothing_tailored(self, tmp_path, monkeypatch):
         monkeypatch.setattr(ap, "DB_PATH", str(tmp_path / "jobs.db"))
-        assert ap.resume_used("u") == "General/default resume"
+        assert ap.resume_used("u") == "Default"
 
     def test_tailored_resume_link(self, tmp_path, monkeypatch):
         monkeypatch.setattr(ap, "DB_PATH", str(tmp_path / "jobs.db"))
         ap.record_tailored("u", "Haatim_Ali_Figma_Resume.pdf", "https://discord.com/channels/1/2/3")
-        assert ap.resume_used("u") == '=HYPERLINK("https://discord.com/channels/1/2/3", "Haatim_Ali_Figma_Resume.pdf")'
+        assert ap.resume_used("u") == '=HYPERLINK("https://discord.com/channels/1/2/3", "Tailored ↗")'
 
     def test_tailored_without_link_is_file_name(self, tmp_path, monkeypatch):
         monkeypatch.setattr(ap, "DB_PATH", str(tmp_path / "jobs.db"))

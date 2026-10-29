@@ -45,7 +45,7 @@ WEBHOOK_URL  = os.getenv("DISCORD_WEBHOOK_URL")
 BOT_TOKEN    = os.getenv("DISCORD_BOT_TOKEN")
 APPLY_CHANNEL_ID = os.getenv("APPLICATIONS_CHANNEL_ID")  # #applications: packet-ready + applied notices
 DISCORD_USER_ID  = os.getenv("DISCORD_USER_ID")
-DEFAULT_RESUME   = "General/default resume"
+DEFAULT_RESUME   = "Default"
 from claude_json import DRAFT_MODEL as MODEL
 HEADERS      = {"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36"}
 TIMEOUT      = 20

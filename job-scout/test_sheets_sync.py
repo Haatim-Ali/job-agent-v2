@@ -5,18 +5,21 @@ Run with: python -m pytest job-scout/test_sheets_sync.py -v
 
 import re
 
+import pytest
+
 import sheets_sync as ss
 
-HEADER = ["Company", "", "Role", "Contact", "", "Link to Posting", "Job Status", "Notes", "Resume Used"]
-PLACEHOLDER = ["s"]
+HEADER = ss.HEADER
+STATUS_BLUE = ss.STATUS_COLORS["Applied"][1]
 
 
 class FakeWorksheet:
     def __init__(self, title, rows):
         self.title = title
         self.rows = [list(r) for r in rows]
+        self.sorted = []
 
-    def get_all_values(self):
+    def get_all_values(self, **kwargs):
         return [list(r) for r in self.rows]
 
     def _set(self, row, col, value):
@@ -27,17 +30,16 @@ class FakeWorksheet:
             r.append("")
         r[col - 1] = value
 
-    def update_acell(self, a1, value):
-        col, row = re.match(r"([A-Z])(\d+)", a1).groups()
-        self._set(int(row), ord(col) - 64, value)
-
-    def update(self, rng, values, **kwargs):
-        col, row = re.match(r"([A-Z])(\d+)", rng).groups()
+    def update(self, range_name, values, **kwargs):
+        col, row = re.match(r"([A-Z])(\d+)", range_name).groups()
         for offset, v in enumerate(values[0]):
             self._set(int(row), ord(col) - 64 + offset, v)
 
     def append_row(self, values, **kwargs):
         self.rows.append(list(values))
+
+    def sort(self, *specs, range=None):
+        self.sorted.append((specs, range))
 
 
 class FakeSheet:
@@ -48,10 +50,24 @@ class FakeSheet:
         return self._ws
 
 
+def _row(company, role, status="Applied", url="", resume=""):
+    return [company, role, status, "10/1/2026", "10/1/2026", "JobAgent", "", ss.posting_cell(url), resume, ""]
+
+
 def _sheet():
-    product = FakeWorksheet("Product", [HEADER, PLACEHOLDER, ["Adobe"], ["Stripe", "", "SWE Intern", "Jane", "", "https://x/1", "Applied"]])
-    consulting = FakeWorksheet("Consulting", [HEADER, PLACEHOLDER, ["IBM Consulting"]])
-    return FakeSheet(product, consulting), product, consulting
+    apps = FakeWorksheet(ss.APPS_TAB, [
+        HEADER,
+        _row("Stripe", "SWE Intern", url="https://x.com/jobs/1?src=linkedin"),
+        _row("NVIDIA", "Deep Learning Intern", url="https://nvidia.wd5.myworkdayjobs.com/job/DL_JR1"),
+        _row("Cisco", "Software Engineer", url="https://careers.cisco.com/global/en/job/1"),
+    ])
+    other = FakeWorksheet("Consulting", [["Company"], ["McKinsey"]])
+    return FakeSheet(other, apps), apps, other
+
+
+@pytest.fixture(autouse=True)
+def fixed_today(monkeypatch):
+    monkeypatch.setattr(ss, "today", lambda: "10/29/2026")
 
 
 def test_normalize_company():
@@ -60,44 +76,93 @@ def test_normalize_company():
     assert ss.normalize_company("Adobe Systems") == "adobe"
 
 
-def test_fills_existing_company_row_with_blank_role():
-    sheet, product, _ = _sheet()
-    msg = ss.record("Adobe Systems", "2027 Intern - Software Engineer", "https://x/2", "applied", "note", sheet=sheet)
-    assert product.rows[2][:8] == ["Adobe", "", "2027 Intern - Software Engineer", "", "", "https://x/2", "Applied", "note"]
-    assert "Product row 3" in msg
+def test_url_key_ignores_query_and_markdown():
+    assert ss.url_key("**https://X.com/jobs/1/?shared_id=abc**") == "x.com/jobs/1"
+    assert ss.url_key("") == ""
 
 
-def test_status_update_by_link_keeps_contact():
-    sheet, product, _ = _sheet()
-    ss.record("Stripe", "SWE Intern", "https://x/1", "interview", sheet=sheet)
-    assert product.rows[3][6] == "Interviewing"
-    assert product.rows[3][3] == "Jane"
+def test_new_application_appended_with_dates_and_link_then_sorted():
+    sheet, apps, other = _sheet()
+    msg = ss.record("Celestica", "Student Intern", "https://c.com/j/4", "applied", sheet=sheet)
+    assert apps.rows[-1] == ["Celestica", "Student Intern", "Applied", "10/29/2026", "10/29/2026", "JobAgent", "",
+                             '=HYPERLINK("https://c.com/j/4", "Open ↗")', "", ""]
+    assert apps.sorted == [(((4, "des"), (5, "des")), "A2:J5")]
+    assert "added Celestica" in msg
+    assert other.rows == [["Company"], ["McKinsey"]]  # other tabs untouched
+
+
+def test_second_role_at_same_company_is_its_own_row():
+    sheet, apps, _ = _sheet()
+    msg = ss.record("Stripe", "ML Intern", "https://x.com/jobs/2", "applied", sheet=sheet)
+    assert [r[1] for r in apps.rows if r[0] == "Stripe"] == ["SWE Intern", "ML Intern"]
+    assert "2 roles there now" in msg
+
+
+def test_status_update_by_link_even_with_different_query_string():
+    sheet, apps, _ = _sheet()
+    msg = ss.record("Stripe", "SWE Intern", "https://x.com/jobs/1?utm=email", "rejected", sheet=sheet)
+    assert apps.rows[1][2] == "Rejected"
+    assert apps.rows[1][4] == "10/29/2026"
+    assert apps.rows[1][3] == "10/1/2026"  # applied date kept
+    assert "row 2: status → Rejected" in msg
 
 
 def test_status_update_by_company_and_role():
-    sheet, product, _ = _sheet()
-    ss.record("Stripe", "swe intern", "", "rejected", sheet=sheet)
-    assert product.rows[3][6] == "Rejected"
+    sheet, apps, _ = _sheet()
+    ss.record("Stripe, Inc.", "swe  intern", "", "interview", sheet=sheet)
+    assert apps.rows[1][2] == "Interviewing"
 
 
-def test_new_role_at_filled_company_appends_row():
-    sheet, product, _ = _sheet()
-    ss.record("Stripe", "ML Intern", "https://x/3", "applied", sheet=sheet)
-    assert product.rows[3][2] == "SWE Intern"
-    assert product.rows[-1][:3] == ["Stripe", "", "ML Intern"]
+def test_logging_same_application_twice_does_not_duplicate():
+    sheet, apps, _ = _sheet()
+    msg = ss.record("NVIDIA", "Deep Learning Intern", "https://nvidia.wd5.myworkdayjobs.com/job/DL_JR1?shared_id=z",
+                    "applied", sheet=sheet)
+    assert len(apps.rows) == 4
+    assert "already tracked" in msg
 
 
-def test_unknown_company_appends_to_first_tab():
-    sheet, product, consulting = _sheet()
-    ss.record("Celestica", "Student Intern", "https://x/4", "applied", sheet=sheet)
-    assert product.rows[-1][0] == "Celestica"
-    assert len(consulting.rows) == 3
+def test_unknown_company_named_from_posting_link():
+    # Regression: two rows were logged as "Unknown Company" (an NVIDIA and a Cisco posting).
+    sheet, apps, _ = _sheet()
+    ss.record("Unknown Company", "Consulting Engineer Intern", "https://careers.cisco.com/global/en/job/2**",
+              "applied", sheet=sheet)
+    assert apps.rows[-1][0] == "Cisco"
+    assert apps.rows[-1][7] == '=HYPERLINK("https://careers.cisco.com/global/en/job/2", "Open ↗")'
 
 
-def test_matches_company_on_other_tab():
-    sheet, _, consulting = _sheet()
-    ss.record("IBM Consulting", "BT Consultant Intern", "", "applied", sheet=sheet)
-    assert consulting.rows[2][2] == "BT Consultant Intern"
+def test_legacy_logged_from_note_dropped():
+    sheet, apps, _ = _sheet()
+    ss.record("Glean", "SWE Intern", "https://g.com/1", "applied", "logged from Discord 10/29/2026", sheet=sheet)
+    assert apps.rows[-1][9] == ""
+    ss.record("Plaid", "SWE Intern", "https://p.com/1", "applied", "Remote; referral", sheet=sheet)
+    assert apps.rows[-1][9] == "Remote; referral"
+
+
+def test_to_apply_has_no_applied_date():
+    sheet, apps, _ = _sheet()
+    ss.record("ByteDance", "Researcher", "https://b.com/1", "to_apply", sheet=sheet)
+    assert apps.rows[-1][2:4] == ["To Apply", ""]
+
+
+def test_resume_cells():
+    assert ss.resume_cell("Haatim_Ali_Stripe_Resume.pdf", "https://discord.com/channels/1/2/3") == \
+        '=HYPERLINK("https://discord.com/channels/1/2/3", "Tailored ↗")'
+    assert ss.resume_cell("General/default resume") == "Default"
+
+
+def test_resume_written_on_update_and_untouched_without_one():
+    sheet, apps, _ = _sheet()
+    ss.record("Stripe", "SWE Intern", "https://x.com/jobs/1", "interview", sheet=sheet)
+    assert apps.rows[1][8] == ""
+    ss.record("Stripe", "SWE Intern", "https://x.com/jobs/1", "applied", sheet=sheet, resume="R")
+    assert apps.rows[1][8] == "R"
+
+
+def test_missing_applications_tab_is_reported():
+    sheet = FakeSheet(FakeWorksheet("Product", [["Company"]]))
+    assert ss.record_safe("Adobe", "Intern", "", "applied", sheet=sheet) is None
+    with pytest.raises(RuntimeError, match="--layout"):
+        ss.record("Adobe", "Intern", "", "applied", sheet=sheet)
 
 
 def test_disabled_without_env(monkeypatch):
@@ -123,20 +188,12 @@ def test_record_safe_swallows_errors():
     assert ss.record_safe("Adobe", "Intern", "", "applied", sheet=Broken()) is None
 
 
-def test_resume_used_written_on_new_update_and_fill():
-    sheet, product, _ = _sheet()
-    link = ss.resume_cell("Haatim_Ali_Stripe_Resume.pdf", "https://discord.com/channels/1/2/3")
-    assert link == '=HYPERLINK("https://discord.com/channels/1/2/3", "Haatim_Ali_Stripe_Resume.pdf")'
-    ss.record("Stripe", "SWE Intern", "https://x/1", "applied", sheet=sheet, resume=link)
-    assert product.rows[3][8] == link
-    ss.record("Adobe", "Intern", "https://x/2", "applied", sheet=sheet, resume="General/default resume")
-    assert product.rows[2][8] == "General/default resume"
-    ss.record("Celestica", "Intern", "https://x/4", "applied", sheet=sheet, resume="r.pdf")
-    assert product.rows[-1][8] == "r.pdf"
-
-
-def test_resume_used_untouched_without_resume():
-    sheet, product, _ = _sheet()
-    product.rows[3] += ["", "keep me"]
-    ss.record("Stripe", "SWE Intern", "https://x/1", "interview", sheet=sheet)
-    assert product.rows[3][8] == "keep me"
+def test_dashboard_formulas_use_open_ranges_on_applications():
+    cells = dict(ss.dashboard_cells())
+    assert cells["B6"].startswith("=COUNTIFS('Applications'!C2:C")
+    assert all(f"B{11 + i}" in cells for i in range(len(ss.STATUS_ORDER)))
+    assert "group by A" in cells["B23"]
+    assert "select Col2 " in cells["G23"] and "select Col3 " in cells["L23"]
+    assert cells["D12"].startswith("=SPARKLINE(C12") and STATUS_BLUE in cells["D12"]
+    # every status in the dropdown has a chip colour
+    assert set(ss.STATUS_ORDER) == set(ss.STATUS_COLORS)

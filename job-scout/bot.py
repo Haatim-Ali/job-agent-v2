@@ -62,15 +62,17 @@ def normalize_emoji(emoji):
     return "".join(ch for ch in str(emoji) if not ("\U0001F3FB" <= ch <= "\U0001F3FF" or ch == "\uFE0F"))
 
 
-STATUSES = ["applied", "phone_screen", "interview", "offer", "rejected", "withdrawn"]
+STATUSES = ["applied", "assessment", "phone_screen", "interview", "offer", "rejected", "closed", "withdrawn"]
 
 STATUS_EMOJI = {
     "applied": "✅",
+    "assessment": "📝",
     "phone_screen": "📞",
     "interview": "🎯",
     "offer": "🎉",
     "rejected": "❌",
     "withdrawn": "🚫",
+    "closed": "🔒",
 }
 
 HELP_TEXT = """**Job Scout Commands:**
