@@ -257,3 +257,23 @@ def test_same_company_tolerates_suffixes_and_longer_names():
     assert ss.same_company("Rivian and Volkswagen Group Technologies", "Rivian and Volkswagen Group")
     assert ss.same_company("Niantic Spatial, Inc.", "Niantic Spatial")
     assert not ss.same_company("HP", "HPE")
+
+
+def test_confirmation_without_role_at_multi_role_company_is_quiet():
+    # Regression: Cisco/Aurora/HP "we received your application" emails asked "which role?" for nothing.
+    sheet, apps = _email_sheet()
+    assert ss.record_email("NVIDIA", "", "applied", "10/26/2026", "x", sheet=sheet) == "unchanged"
+
+
+def test_confirmation_for_untracked_role_at_known_company_adds_row():
+    sheet, apps = _email_sheet()
+    msg = ss.record_email("NVIDIA", "Research Intern, World Models and Synthetic Data", "applied", "10/25/2026", "x",
+                          sheet=sheet)
+    assert apps.rows[-1][:3] == ["NVIDIA", "Research Intern, World Models and Synthetic Data", "Applied"]
+    assert "added NVIDIA" in msg
+
+
+def test_confirmation_with_different_title_at_single_role_company_matches():
+    sheet, apps = _email_sheet()
+    assert ss.record_email("Stripe", "Early Adopter Product Builder", "applied", "10/1/2026", "x", sheet=sheet) == "unchanged"
+    assert len(apps.rows) == 5

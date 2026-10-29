@@ -215,20 +215,24 @@ def role_score(a, b):
     return SequenceMatcher(None, a, b).ratio() if a and b else 0.0
 
 
-def pick_row(rows, company, role):
-    """(row number, None) for the row an email is about, or (None, reason) when it can't be told
-    apart from the company's other roles. (None, None) when the company isn't in the sheet."""
+def pick_row(rows, company, role, status=""):
+    """(row number, None) for the row an email is about; (None, None) when it's about an application
+    not in the sheet (a new row); (None, reason) when it can't be told apart from the company's
+    other roles, so Haatim decides."""
     cands = [i for i, r in enumerate(rows[1:], start=2) if r and same_company(r[0], company)]
     if not cands:
         return None, None
     scored = sorted(((role_score(rows[i - 1][1], role), i) for i in cands), reverse=True)
     best, row = scored[0]
-    if len(cands) == 1 and (not role or best >= 0.4):
+    clear = len(scored) == 1 or best - scored[1][0] >= 0.1
+    if len(cands) == 1 and (status == "applied" or not role or best >= 0.4):
+        return row, None  # titles in emails often differ from the posting's (OpenArt, ASML)
+    if role and best >= (0.6 if status == "applied" else 0.75) and clear:
         return row, None
-    if best >= 0.75 and (len(scored) == 1 or best - scored[1][0] >= 0.1):
-        return row, None
-    if len(cands) == 1:
-        return None, None  # a different role at a company with one tracked application
+    if role and best < 0.4:
+        return None, None  # a role at this company that isn't tracked yet
+    if status == "applied" and all(STATUS_RANK.get(rows[i - 1][2], 0) >= 1 for i in cands):
+        return cands[0], None  # a confirmation can't change any of them; no need to ask
     return None, f"{len(cands)} roles at {rows[cands[0] - 1][0]} in the sheet"
 
 
@@ -240,7 +244,7 @@ def record_email(company, role, status, when, note, sheet=None):
     ws = _apps_tab(sheet)
     rows = [r + [""] * (len(HEADER) - len(r)) for r in ws.get_all_values(value_render_option="FORMULA")]
     label = STATUS_LABELS.get(status, status.title())
-    row, why = pick_row(rows, company, role)
+    row, why = pick_row(rows, company, role, status)
     if why:
         return f"ambiguous: {why}"
     if row is not None:
