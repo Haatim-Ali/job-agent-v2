@@ -1037,7 +1037,7 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 
 # Changelog
 
-**2026-10-29: inbox check for htali@ucsc.edu.** New `email_scan.py`: read-only Gmail API access, Claude Haiku labels each recruiting email, `sheets_sync.record_email` updates the matching Applications row (never backwards; asks when several roles could match), summary in #reactions, `!inbox` command, cron twice a day. 15 tests added.
+**2026-10-29: inbox check for htali@ucsc.edu.** New `email_scan.py`: read-only Gmail API access, Claude Haiku labels each recruiting email, `sheets_sync.record_email` updates the matching Applications row (never backwards; asks when several roles could match), summary in #reactions, `!inbox` command, cron twice a day. 15 tests added. `PRIVACY.md` added for the Google sign-in screen (production mode needs a privacy policy link).
 
 **2026-10-29: tracker sheet redesigned.** New Dashboard, Applications (one row per position, status chips, dates, source, links) and Targets tabs; the old Product tab is hidden as "Product (old)", other tabs untouched. `sheets_sync.py` now writes only to Applications, matches postings by host + path, names "Unknown Company" rows from the link, records Applied/Updated dates, and sorts newest first. Data moved over: 82 applications; one duplicate NVIDIA row dropped and two KLA rows for the same req merged. From Gmail: 4 AMD applications, Architexor and GAO Tek (Wellfound, expired), ByteDance AI Platform (assessment invite 10/5) and TikTok (CodeSignal invite expired 10/10). New statuses `assessment` and `closed` in `!status`. Tests rewritten for the new layout.
 
