@@ -209,10 +209,22 @@ def same_company(a, b):
     return bool(a and b) and (a == b or a.startswith(b + " ") or b.startswith(a + " "))
 
 
-def role_score(a, b):
-    from difflib import SequenceMatcher
-    a, b = normalize_title(a), normalize_title(b)
-    return SequenceMatcher(None, a, b).ratio() if a and b else 0.0
+# Words every internship title shares; ignoring them makes "IT Software Developer Internship 2027"
+# and "IT Data Analyst Internship 2027" different roles, as they are.
+_GENERIC = set("""intern interns internship internships co op coop the a an and of for in to it
+    summer spring fall winter 2026 2027 2028 bs ms bachelor bachelors master masters student
+    program position role new grad university early career careers us usa remote hq""".split())
+
+
+def role_words(title, company=""):
+    skip = _GENERIC | set(normalize_title(company).split())
+    return {w for w in normalize_title(title).split() if w not in skip}
+
+
+def role_score(a, b, company=""):
+    """Share of distinctive title words two roles have in common (0..1)."""
+    wa, wb = role_words(a, company), role_words(b, company)
+    return len(wa & wb) / len(wa | wb) if wa and wb else 0.0
 
 
 def pick_row(rows, company, role, status=""):
@@ -222,17 +234,21 @@ def pick_row(rows, company, role, status=""):
     cands = [i for i, r in enumerate(rows[1:], start=2) if r and same_company(r[0], company)]
     if not cands:
         return None, None
-    scored = sorted(((role_score(rows[i - 1][1], role), i) for i in cands), reverse=True)
+    label = STATUS_LABELS.get(status, status.title())
+    scored = sorted(((role_score(rows[i - 1][1], role, company), i) for i in cands), reverse=True)
     best, row = scored[0]
-    clear = len(scored) == 1 or best - scored[1][0] >= 0.1
-    if len(cands) == 1 and (status == "applied" or not role or best >= 0.4):
-        return row, None  # titles in emails often differ from the posting's (OpenArt, ASML)
-    if role and best >= (0.6 if status == "applied" else 0.75) and clear:
+    clear = len(scored) == 1 or best - scored[1][0] >= 0.15
+    if role and best >= 0.5 and clear:
         return row, None
-    if role and best < 0.4:
+    if len(cands) == 1 and (status == "applied" or not role or rows[row - 1][5] != "Email"):
+        # Email titles often differ from the posting's (OpenArt, ASML); a row that came from an
+        # email already has the company's own title, so a different title there is another role.
+        return row, None
+    if role and best < 0.5:
         return None, None  # a role at this company that isn't tracked yet
-    if status == "applied" and all(STATUS_RANK.get(rows[i - 1][2], 0) >= 1 for i in cands):
-        return cands[0], None  # a confirmation can't change any of them; no need to ask
+    if any(STATUS_RANK.get(rows[i - 1][2], 0) >= STATUS_RANK.get(label, 0) for i in cands) and \
+            (status == "applied" or any(rows[i - 1][2] == label for i in cands)):
+        return cands[0], None  # a confirmation or a repeat (e.g. an assessment reminder): nothing to change
     return None, f"{len(cands)} roles at {rows[cands[0] - 1][0]} in the sheet"
 
 

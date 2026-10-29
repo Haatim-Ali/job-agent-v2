@@ -30,7 +30,7 @@ DB_PATH = os.path.join(SCRIPT_DIR, "jobs.db")
 TOKEN_PATH = os.getenv("GMAIL_TOKEN_JSON") or os.path.join(SCRIPT_DIR, "gmail_token.json")
 SCOPES = ["https://www.googleapis.com/auth/gmail.readonly"]
 API = "https://gmail.googleapis.com/gmail/v1/users/me"
-SCAN_SINCE = "2026/08/01"  # the first run reads back to here; later runs read the last 4 days
+SCAN_SINCE = "2026/08/01"  # every run lists mail since here; messages already handled are skipped
 PACIFIC = ZoneInfo("America/Los_Angeles")
 
 # Senders and subjects that recruiting mail comes from. Broad on purpose: Claude decides
@@ -166,10 +166,6 @@ def seen(conn, msg_id):
     return conn.execute("SELECT 1 FROM email_events WHERE msg_id = ?", (msg_id,)).fetchone() is not None
 
 
-def first_run(conn):
-    return conn.execute("SELECT COUNT(*) FROM email_events").fetchone()[0] == 0
-
-
 def save(conn, email, c, result):
     conn.execute("INSERT OR REPLACE INTO email_events VALUES (?,?,?,?,?,?,?,?,?,?)",
                  (email["id"], email["date"], email["from"], email["subject"], c["kind"], c["company"],
@@ -200,14 +196,19 @@ def scan(client=None, sess=None, sheet=None, conn=None, dry=False):
     if client is None:
         import anthropic
         client = anthropic.Anthropic()
-    since = SCAN_SINCE if first_run(conn) else None
-    query = QUERY + (f" after:{since}" if since else " newer_than:4d")
+    # Always list back to SCAN_SINCE (listing is cheap; only unseen messages are fetched), so a
+    # run that crashed halfway is finished by the next one.
+    query = QUERY + f" after:{SCAN_SINCE}"
     events = []
     for msg_id in reversed(list_ids(sess, query)):  # oldest first, so later news wins
         if seen(conn, msg_id):
             continue
-        email = parse_message(sess.get(f"{API}/messages/{msg_id}", params={"format": "full"}, timeout=30).json())
-        c = classify(client, email)
+        try:
+            email = parse_message(sess.get(f"{API}/messages/{msg_id}", params={"format": "full"}, timeout=30).json())
+            c = classify(client, email)
+        except Exception as e:  # not saved, so it is retried next run
+            logging.warning(f"Inbox check: skipped message {msg_id}: {e}")
+            continue
         status = KIND_STATUS.get(c["kind"])
         if not status or not c["company"]:
             result = "ignored"

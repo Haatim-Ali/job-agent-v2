@@ -277,3 +277,25 @@ def test_confirmation_with_different_title_at_single_role_company_matches():
     sheet, apps = _email_sheet()
     assert ss.record_email("Stripe", "Early Adopter Product Builder", "applied", "10/1/2026", "x", sheet=sheet) == "unchanged"
     assert len(apps.rows) == 5
+
+
+def test_similar_looking_titles_are_different_roles():
+    # Regression: GALLO's "IT Data Analyst" rejection was matched to its "IT Software Developer" row.
+    sheet, apps = _email_sheet()
+    apps.rows.append(["GALLO", "IT Software Developer Internship 2027", "Rejected", "", "10/29/2026", "Email", "", "", "", ""])
+    msg = ss.record_email("GALLO", "IT Data Analyst Internship 2027", "rejected", "10/29/2026", "x", sheet=sheet)
+    assert "added GALLO" in msg
+    assert ss.role_score("2027 Systems Software Engineering Intern", "Systems Software Engineering Intern 2027") == 1
+
+
+def test_named_untracked_role_at_multi_role_company_adds_row():
+    # Regression: IBM assessments for other IBM roles were reported as "which role?" questions.
+    sheet, apps = _email_sheet()
+    msg = ss.record_email("NVIDIA", "Product Manager Intern 2027", "assessment", "9/2/2026", "x", sheet=sheet)
+    assert "added NVIDIA" in msg
+
+
+def test_reminder_without_role_is_quiet_when_a_row_already_has_that_status():
+    sheet, apps = _email_sheet()
+    apps.rows[1][2] = "Assessment"
+    assert ss.record_email("NVIDIA", "", "assessment", "9/3/2026", "x", sheet=sheet) == "unchanged"

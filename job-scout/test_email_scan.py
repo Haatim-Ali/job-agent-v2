@@ -73,7 +73,7 @@ def test_scan_updates_sheet_records_each_email_once_and_reports(tmp_path, fake_c
     conn = es.db_conn(str(tmp_path / "jobs.db"))
     events = es.scan(client=object(), sess=gmail, sheet=sheet, conn=conn)
 
-    assert "after:2026/08/01" in gmail.queries[0]  # first run reads back
+    assert "after:2026/08/01" in gmail.queries[0]
     assert apps.rows[1][2] == "Rejected"
     assert [e["company"] for e in events] == ["Stripe", "NVIDIA"]
     assert events[1]["result"].startswith("ambiguous")
@@ -83,9 +83,28 @@ def test_scan_updates_sheet_records_each_email_once_and_reports(tmp_path, fake_c
     assert "❌ **Stripe**: Not moving forward" in text
     assert "2 roles at NVIDIA in the sheet. Which one?" in text
 
-    # second run: only recent mail, nothing re-handled
+    # second run lists the same range but handles nothing again
     assert es.scan(client=object(), sess=gmail, sheet=sheet, conn=conn) == []
-    assert "newer_than:4d" in gmail.queries[1]
+    assert "after:2026/08/01" in gmail.queries[1]
+
+
+def test_a_failing_message_is_skipped_and_retried_later(tmp_path, monkeypatch):
+    # Regression: one error mid-backfill crashed the run and the rest of the inbox was never read.
+    apps = FakeWorksheet(ss.APPS_TAB, [HEADER, _row("Stripe", "SWE Intern")])
+    calls = []
+
+    def flaky(client, email):
+        calls.append(email["id"])
+        if email["id"] == "a" and calls.count("a") == 1:
+            raise RuntimeError("overloaded")
+        return {"kind": "rejection", "company": "Stripe", "role": "", "summary": "No"}
+    monkeypatch.setattr(es, "classify", flaky)
+    conn = es.db_conn(str(tmp_path / "jobs.db"))
+    gmail = FakeGmail([_msg("a", "s", "b"), _msg("b", "s", "b")])
+    es.scan(client=object(), sess=gmail, sheet=FakeSheet(apps), conn=conn)
+    assert [r[0] for r in conn.execute("SELECT msg_id FROM email_events")] == ["b"]
+    es.scan(client=object(), sess=gmail, sheet=FakeSheet(apps), conn=conn)
+    assert sorted(r[0] for r in conn.execute("SELECT msg_id FROM email_events")) == ["a", "b"]
 
 
 def test_dry_run_changes_nothing(tmp_path, fake_claude, capsys):
