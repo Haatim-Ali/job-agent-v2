@@ -798,7 +798,7 @@ Since 2026-09-30 every application uses **htali@ucsc.edu**, so that inbox is whe
 
 **One run:**
 
-1. List messages matching a broad query: mail from applicant-tracking systems (Workday, Greenhouse, Ashby, Lever, SmartRecruiters, iCIMS, Jobvite, CodeSignal, HackerRank, Wellfound and more), subjects with "application", "interview", "assessment" and the like, or the word "unfortunately". The first run reads back to 2026-08-01; later runs read the last 4 days.
+1. List messages matching a broad query: mail from applicant-tracking systems (Workday, Greenhouse, Ashby, Lever, SmartRecruiters, iCIMS, Jobvite, CodeSignal, HackerRank, Wellfound and more), subjects with "application", "interview", "assessment" and the like, or the word "unfortunately", excluding mail from @ucsc.edu senders (classmates, clubs, classes: fraternity rush "interviews" once became rows) and mail Haatim sent. Every run lists back to 2026-08-01; listing is cheap and only unseen messages are fetched, so a run that fails halfway is finished by the next. One message that errors is skipped and retried next run.
 2. Skip any message already in the `email_events` table, so each email is handled once.
 3. Claude Haiku (temperature 0, structured output) labels each one: rejection, assessment, interview, offer, confirmation or other, plus company, role and a 12-word summary. Anything that isn't clearly about an application is "other" and ignored.
 4. `sheets_sync.record_email` finds the row: same company (tolerating suffixes such as "Inc." and longer names), then the closest role by text similarity when the company has several. A company with one tracked row always matches (email titles often differ from the posting's). A named role that matches none of the company's rows is a new application. A confirmation that can't be pinned to one of several roles changes nothing and asks nothing; any other email that can't be pinned down is left for Haatim and the summary asks him. A row only moves forward (`STATUS_RANK`): a late "we received your application" never undoes a rejection, and only an offer beats a rejection. An email about an untracked application adds a row with Source "Email".
@@ -806,7 +806,9 @@ Since 2026-09-30 every application uses **htali@ucsc.edu**, so that inbox is whe
 
 If the sign-in expires or is revoked, the run posts a warning in #reactions with the command to sign in again. `!inbox` in Discord runs a check immediately.
 
-**Cron:** 15:05 and 01:05 UTC (about 8 am and 6 pm Pacific), log `/var/log/jobscout_email.log`.
+**Cron:** 15:05 and 01:05 UTC (about 8 am and 6 pm Pacific) under `flock`, log `/var/log/jobscout_email.log` (in the logrotate config).
+
+**Matching titles.** `role_score` compares the distinctive words of two titles (ignoring intern, summer, 2027, the company's name and the like), so "IT Software Developer Internship 2027" and "IT Data Analyst Internship 2027" are different roles.
 
 ## Discord
 
@@ -1037,7 +1039,7 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 
 # Changelog
 
-**2026-10-29: inbox check for htali@ucsc.edu.** New `email_scan.py`: read-only Gmail API access, Claude Haiku labels each recruiting email, `sheets_sync.record_email` updates the matching Applications row (never backwards; asks when several roles could match), summary in #reactions, `!inbox` command, cron twice a day. 15 tests added. `PRIVACY.md` added for the Google sign-in screen (production mode needs a privacy policy link).
+**2026-10-29: inbox check for htali@ucsc.edu.** New `email_scan.py`: read-only Gmail API access, Claude Haiku labels each recruiting email, `sheets_sync.record_email` updates the matching Applications row (never backwards; asks when several roles could match), summary in #reactions, `!inbox` command, cron twice a day. 15 tests added. `PRIVACY.md` added for the Google sign-in screen (production mode needs a privacy policy link). First backfill: 324 emails since August; added Amazon, Scale AI, Veeam, xAI, GALLO (2 rejections), 3 IBM roles, NVIDIA World Models; marked Amazon, IBM (2) and Clay rejected.
 
 **2026-10-29: tracker sheet redesigned.** New Dashboard, Applications (one row per position, status chips, dates, source, links) and Targets tabs; the old Product tab is hidden as "Product (old)", other tabs untouched. `sheets_sync.py` now writes only to Applications, matches postings by host + path, names "Unknown Company" rows from the link, records Applied/Updated dates, and sorts newest first. Data moved over: 82 applications; one duplicate NVIDIA row dropped and two KLA rows for the same req merged. From Gmail: 4 AMD applications, Architexor and GAO Tek (Wellfound, expired), ByteDance AI Platform (assessment invite 10/5) and TikTok (CodeSignal invite expired 10/10). New statuses `assessment` and `closed` in `!status`. Tests rewritten for the new layout.
 
