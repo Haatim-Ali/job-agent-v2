@@ -80,6 +80,13 @@ MAX_TAILORED_PER_RUN = _cfg.get("max_tailored_per_run", 15)
 # forms with each site's own autofill and the tailored resume. The code is kept.
 APPLICATION_PACKETS = _cfg.get("application_packets", False)
 CHANNEL_ID = os.getenv("DISCORD_CHANNEL_ID")
+# Read-only channel for a friend: PM, IT, data, forward deployed and solutions internships, posted
+# with their links and nothing else (no tailoring, no reactions, no pings). shared_channel in the config.
+SHARED = _cfg.get("shared_channel", {})
+SHARED_WEBHOOK_URL = os.getenv("SHARED_WEBHOOK_URL")
+SHARED_ENABLED = bool(SHARED.get("enabled") and SHARED_WEBHOOK_URL)
+SHARED_TRACKS = SHARED.get("tracks", {})
+SHARED_COLORS = ["9B59B6", "1ABC9C", "E67E22", "E74C3C", "3498DB", "F1C40F"]
 _alerted_jobs = []   # jobs alerted this run, tailored at the end of the run
 
 
@@ -199,6 +206,23 @@ def quick_filter(job):
             pass
 
     return True, "ok"
+
+
+def _keyword_re(keyword):
+    """Whole-word pattern for a track keyword; a trailing * matches any ending ("product manag*")."""
+    word = re.escape(keyword.rstrip("*"))
+    return rf"\b{word}" if keyword.endswith("*") else rf"\b{word}\b"
+
+
+_TRACK_RES = {track: re.compile("|".join(_keyword_re(k) for k in kws)) for track, kws in SHARED_TRACKS.items() if kws}
+
+
+def shared_track(title):
+    """The shared channel track a job title belongs to (the first that matches), or None."""
+    if not SHARED_ENABLED:
+        return None
+    t = re.sub(r"[^a-z0-9]+", " ", str(title or "").lower())
+    return next((track for track, rx in _TRACK_RES.items() if rx.search(t)), None)
 
 
 def detect_repost(job):
@@ -407,19 +431,99 @@ experience_required (e.g. "0-1 years" or "5+ years"), location_ok (true/false)."
         result["fit_score"] = max(1, min(10, int(result["fit_score"])))   # schemas can't enforce ranges
         return result
     except Exception as e:
-        logging.warning(f"Claude check failed: {e}")
-        # Account-level problems (no credits, bad key) will fail every call: stop trying this run
-        account_problem = isinstance(e, (anthropic.AuthenticationError, anthropic.PermissionDeniedError)) \
-            or "credit balance" in str(e).lower()
-        if account_problem:
-            _claude_unavailable = e
-            notify_api_problem(e)
-        # Temporary outages are worth retrying next run too; anything else (e.g. unparseable
-        # output for one job) is treated as a rejection so it can't be retried forever.
-        transient = isinstance(e, (anthropic.RateLimitError, anthropic.APIConnectionError,
-                                   anthropic.InternalServerError))
-        return {"relevant": False, "reason": "api error", "fit_score": 0,
-                "api_error": account_problem or transient}
+        return _score_failure(e)
+
+
+def _score_failure(e):
+    """What a failed Claude check returns. api_error=True means: leave the job unseen and retry it."""
+    global _claude_unavailable
+    logging.warning(f"Claude check failed: {e}")
+    # Account-level problems (no credits, bad key) will fail every call: stop trying this run
+    account_problem = isinstance(e, (anthropic.AuthenticationError, anthropic.PermissionDeniedError)) \
+        or "credit balance" in str(e).lower()
+    if account_problem:
+        _claude_unavailable = e
+        notify_api_problem(e)
+    # Temporary outages are worth retrying next run too; anything else (e.g. unparseable
+    # output for one job) is treated as a rejection so it can't be retried forever.
+    transient = isinstance(e, (anthropic.RateLimitError, anthropic.APIConnectionError,
+                               anthropic.InternalServerError))
+    return {"relevant": False, "reason": "api error", "fit_score": 0,
+            "api_error": account_problem or transient}
+
+
+def shared_relevance_check(job, track):
+    """Is this a real student internship in one of the shared channel's tracks? Not scored against
+    anyone's resume: the friend decides what fits. Returns relevant, track and a one-line summary."""
+    if _claude_unavailable:
+        return {"relevant": False, "reason": "api error", "api_error": True}
+    tracks = list(SHARED_TRACKS)
+    schema = obj({"relevant": BOOL, "track": {"type": "string", "enum": tracks + ["none"]}, "reason": STR})
+    prompt = f"""Decide whether this job posting belongs in a job board for undergraduate students looking for
+internships in these fields: {", ".join(tracks)}. "Forward Deployed" means forward deployed engineer or
+deployment strategist roles; "Solutions" means solutions engineer, architect or consultant roles;
+"Technology & Information" means IT, information systems and technology consulting or analyst roles.
+
+relevant is true only if ALL of these hold:
+- it is an internship or co-op for current students (not full-time, not new grad, not only for Master's/PhD students)
+- the work is mainly in one of the fields above (a title that just contains a keyword is not enough)
+- the location is {SHARED.get("locations", "in the United States or remote")}
+- it asks for under 3 years of experience
+
+track: the field it belongs to ("none" if not relevant). The title suggested: {track}.
+reason: one sentence on what the intern would actually do, for the students reading the board.
+
+Job posting:
+Title: {job.get("title")}
+Company: {job.get("company")}
+Location: {job.get("location")}
+Description (first 3500 chars): {str(job.get("description") or "")[:3500]}"""
+    try:
+        client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+        result = ask_json(client, prompt, schema, model=SCORE_MODEL, max_tokens=400, temperature=0,
+                          label="shared_score")
+        result["relevant"] = bool(result["relevant"]) and result["track"] in tracks
+        return result
+    except Exception as e:
+        return _score_failure(e)
+
+
+def age_hours(job):
+    """Hours since the job was posted, or None if unknown."""
+    dp = job.get("date_posted")
+    if not dp:
+        return None
+    try:
+        if hasattr(dp, "tzinfo") and dp.tzinfo is None:
+            dp = dp.replace(tzinfo=timezone.utc)
+        return (datetime.now(timezone.utc) - dp).total_seconds() / 3600
+    except Exception:
+        return None
+
+
+def send_shared_alert(job, result):
+    """Post a job to the friend's read-only channel: the posting and its link, nothing to react to."""
+    hours = age_hours(job)
+    track = result.get("track", "")
+    tracks = list(SHARED_TRACKS)
+    color = SHARED_COLORS[tracks.index(track) % len(SHARED_COLORS)] if track in tracks else "03b2f8"
+    posted = (f"{hours:.0f}h ago" if hours < 48 else f"{hours / 24:.0f} days ago") if hours is not None else "Recently"
+    webhook = DiscordWebhook(url=SHARED_WEBHOOK_URL)
+    embed = DiscordEmbed(
+        title=f"{job.get('title', 'Unknown Role')} @ {job.get('company', 'Unknown')}",
+        url=job.get("job_url", ""),
+        description=str(result.get("reason", "")),
+        color=color,
+    )
+    embed.add_embed_field(name="Track", value=track or "N/A", inline=True)
+    embed.add_embed_field(name="Location", value=str(job.get("location") or "N/A"), inline=True)
+    embed.add_embed_field(name="Posted", value=posted, inline=True)
+    if job.get("applicants") is not None:
+        embed.add_embed_field(name="Applicants", value=str(job.get("applicants")), inline=True)
+    embed.add_embed_field(name="Apply", value=f"[Open the posting]({job.get('job_url', '')})", inline=True)
+    embed.set_footer(text="Click the title to open the posting and apply")
+    webhook.add_embed(embed)
+    webhook.execute()
 
 
 def send_discord_alert(job, analysis, is_repost=False):
@@ -429,19 +533,9 @@ def send_discord_alert(job, analysis, is_repost=False):
     date_posted = job.get("date_posted")
     company_lower = str(job.get("company") or "").lower()
     is_watchlist = any(w in company_lower for w in WATCHLIST_COMPANIES)
+    hours = age_hours(job)
 
-    age_hours = None
-    if date_posted:
-        try:
-            now = datetime.now(timezone.utc)
-            dp = date_posted
-            if hasattr(dp, "tzinfo") and dp.tzinfo is None:
-                dp = dp.replace(tzinfo=timezone.utc)
-            age_hours = (now - dp).total_seconds() / 3600
-        except Exception:
-            pass
-
-    is_hot = not is_repost and age_hours is not None and age_hours <= 1
+    is_hot = not is_repost and hours is not None and hours <= 1
 
     if is_watchlist:
         color = "FFD700"
@@ -455,8 +549,8 @@ def send_discord_alert(job, analysis, is_repost=False):
         flags.append("♻️ REPOST -- timestamp unreliable, likely stale")
     elif is_hot:
         flags.append("🔥 FRESH -- under 1 hour old")
-    elif age_hours is not None and age_hours <= 2:
-        flags.append(f"🔥 FRESH -- posted {age_hours:.0f}h ago")
+    elif hours is not None and hours <= 2:
+        flags.append(f"🔥 FRESH -- posted {hours:.0f}h ago")
     if is_watchlist:
         flags.append("⭐ WATCHLIST COMPANY")
     if job.get("watched"):
@@ -472,7 +566,7 @@ def send_discord_alert(job, analysis, is_repost=False):
         except (ValueError, TypeError):
             pass
 
-    posted_str = f"{age_hours:.1f}h ago" if age_hours is not None else str(date_posted) if date_posted else "Unknown"
+    posted_str = f"{hours:.1f}h ago" if hours is not None else str(date_posted) if date_posted else "Unknown"
     fit_score = analysis.get("fit_score", "?")
     description_preview = str(job.get("description") or "")[:300] + "..."
 
@@ -507,12 +601,20 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
 
     Career-site postings are already age-filtered and have no LinkedIn page to scrape,
     so they skip the page fetch and the freshness/applicant OR filter.
+
+    Jobs whose title is in a shared-channel track are also checked for the friend's read-only
+    channel. Jobs marked shared_only (found only by the shared channel's searches or keywords)
+    skip Haatim's scoring, so his #job-alerts gets exactly what it got before.
     """
     alerted = 0
     for job_dict in jobs:
         job_url = str(job_dict.get("job_url", ""))
         if not job_url or is_seen(conn, job_url):
             continue
+        track = shared_track(job_dict.get("title"))
+        for_main = not job_dict.get("shared_only")
+        if not for_main and not track:
+            continue   # a shared search's off-topic result: not for anyone, and not worth a page fetch
 
         passed, reason = quick_filter(job_dict)
         if not passed:
@@ -553,13 +655,28 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
                 mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
                 continue
 
-        analysis = claude_relevance_check(job_dict)
-        if analysis.get("api_error"):
+        # Both checks run before anything is posted, so a job retried after an API error
+        # can't be alerted twice in either channel
+        analysis = claude_relevance_check(job_dict) if for_main else None
+        shared = shared_relevance_check(job_dict, track) if track and not (analysis or {}).get("api_error") else None
+        if (analysis or {}).get("api_error") or (shared or {}).get("api_error"):
             # Not a real rejection: leave it unseen so the next run scores it
             logging.info(f"Not scored (Claude unavailable), will retry: {job_dict.get('title')} @ {job_dict.get('company')}")
             continue
 
+        if shared and shared.get("relevant"):
+            try:
+                send_shared_alert(job_dict, shared)
+                logging.info(f"Shared alert ({shared.get('track')}): {job_dict.get('title')} @ {job_dict.get('company')}")
+            except Exception as e:
+                logging.warning(f"Shared alert failed for {job_url}: {e}")
+        elif shared:
+            logging.info(f"Shared filtered: {job_dict.get('title')} @ {job_dict.get('company')} -- {shared.get('reason')}")
+
         min_score = 5
+        if not for_main:
+            mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
+            continue
         if job_dict.get("watched"):
             pass   # watched-company internship: always alerted; the score is just shown
         elif not analysis.get("relevant") or analysis.get("fit_score", 0) < min_score:
@@ -627,6 +744,32 @@ def tailor_alerts(jobs, runner=subprocess.run):
     return done
 
 
+def search_linkedin(conn, terms, locations, shared_only=False):
+    """Search LinkedIn internships for every term in every location; returns jobs alerted to Haatim."""
+    alerted = 0
+    for search_term in terms:
+        for location in locations:
+            is_remote = location.strip().lower() == "remote"
+            try:
+                jobs_df = scrape_jobs(
+                    site_name=["linkedin"],
+                    search_term=search_term,
+                    location="United States" if is_remote else location,
+                    results_wanted=40,
+                    hours_old=24,
+                    job_type="internship",
+                    is_remote=is_remote,
+                )
+                if jobs_df is not None and not jobs_df.empty:
+                    logging.info(f"'{search_term}' in {location}: {len(jobs_df)} results")
+                    rows = ({**row.to_dict(), "shared_only": shared_only} for _, row in jobs_df.iterrows())
+                    alerted += process_jobs(rows, conn, is_remote=is_remote)
+            except Exception as e:
+                logging.error(f"Error scraping '{search_term}' in {location}: {e}")
+            time.sleep(2)
+    return alerted
+
+
 def run():
     heartbeat.run_started()
     try:
@@ -648,31 +791,16 @@ def _run():
     try:
         sites = apply_prep.with_learned_boards(CAREER_SITES, conn)
         postings = career_sites.fetch_all(sites, ROLE_KEYWORDS, INTERN_KEYWORDS, CAREER_SITE_EXCLUDE_TITLES,
-                                          watch=WATCH_INTERNSHIPS)
+                                          watch=WATCH_INTERNSHIPS, also=shared_track if SHARED_ENABLED else None)
         total_alerted += process_jobs(postings, conn, from_career_site=True)
     except Exception as e:
         logging.error(f"Career sites step failed: {e}")
 
-    for search_term in SEARCH_TERMS:
-        for location in LOCATIONS:
-            is_remote = location.strip().lower() == "remote"
-            try:
-                jobs_df = scrape_jobs(
-                    site_name=["linkedin"],
-                    search_term=search_term,
-                    location="United States" if is_remote else location,
-                    results_wanted=40,
-                    hours_old=24,
-                    job_type="internship",
-                    is_remote=is_remote,
-                )
-                if jobs_df is not None and not jobs_df.empty:
-                    logging.info(f"'{search_term}' in {location}: {len(jobs_df)} results")
-                    rows = (row.to_dict() for _, row in jobs_df.iterrows())
-                    total_alerted += process_jobs(rows, conn, is_remote=is_remote)
-            except Exception as e:
-                logging.error(f"Error scraping '{search_term}' in {location}: {e}")
-            time.sleep(2)
+    total_alerted += search_linkedin(conn, SEARCH_TERMS, LOCATIONS)
+    # The shared channel's own searches run last, so a job Haatim's searches also find is scored for him first
+    if SHARED_ENABLED:
+        search_linkedin(conn, SHARED.get("search_terms", []), SHARED.get("search_locations", LOCATIONS),
+                        shared_only=True)
 
     conn.close()
 

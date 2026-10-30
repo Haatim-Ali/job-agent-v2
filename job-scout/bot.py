@@ -53,6 +53,13 @@ def reply_channel_id(source_channel_id):
     return ACTIONS_CHANNEL_ID or source_channel_id
 
 
+def is_owner(user_id):
+    """Only Haatim's reactions and messages do anything (tailoring, logging applications), so a
+    friend added to the server can't spend his API credits or change his tracker. With no
+    DISCORD_USER_ID set, everyone counts (the old behaviour)."""
+    return not DISCORD_USER_ID or user_id == DISCORD_USER_ID
+
+
 def bot_channels():
     """Channels whose messages and reactions the bot handles."""
     return {c for c in (CHANNEL_ID, REQUESTS_CHANNEL_ID, ACTIONS_CHANNEL_ID) if c}
@@ -315,7 +322,7 @@ async def on_ready():
 async def on_raw_reaction_add(payload):
     if payload.user_id == client.user.id:
         return
-    if payload.channel_id not in bot_channels():
+    if payload.channel_id not in bot_channels() or not is_owner(payload.user_id):
         return
 
     emoji = normalize_emoji(payload.emoji)
@@ -483,7 +490,7 @@ async def _run_tailor(channel, user_id, job_url, custom_prompt, jd_file=None):
 async def on_message(message):
     if message.author == client.user:
         return
-    if message.channel.id not in bot_channels():
+    if message.channel.id not in bot_channels() or not is_owner(message.author.id):
         return
 
     content = message.content.strip()

@@ -289,13 +289,17 @@ def fetch_simplify(url=SIMPLIFY_URL):
     return jobs
 
 
-def title_matches(title, role_keywords, intern_keywords, exclude_titles):
+def is_internship_title(title, intern_keywords, exclude_titles):
     t = f" {str(title).lower()} "
     if any(x in t for x in exclude_titles):
         return False
     # Whole-word match so "intern" doesn't hit "Internal", "International", "Internals"
-    is_intern = any(re.search(rf"\b{re.escape(k)}s?\b", t) for k in intern_keywords)
-    return is_intern and any(k in t for k in role_keywords)
+    return any(re.search(rf"\b{re.escape(k)}s?\b", t) for k in intern_keywords)
+
+
+def title_matches(title, role_keywords, intern_keywords, exclude_titles):
+    t = f" {str(title).lower()} "
+    return is_internship_title(title, intern_keywords, exclude_titles) and any(k in t for k in role_keywords)
 
 
 def is_watched_internship(job, watch, intern_keywords):
@@ -308,9 +312,11 @@ def is_watched_internship(job, watch, intern_keywords):
     return any(re.search(rf"\b{re.escape(k)}s?\b", t) for k in intern_keywords)
 
 
-def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=()):
+def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=(), also=None):
     """Return recent, title-matching postings from every configured career site. Internships at
-    watched companies are kept whatever the role, and marked job["watched"] = True."""
+    watched companies are kept whatever the role, and marked job["watched"] = True.
+    also(title) -> truthy keeps other internships too (the shared channel's tracks), marked
+    job["shared_only"] = True so they're only checked for that channel."""
     max_age = timedelta(hours=cfg.get("max_age_hours", 72))
     now = datetime.now(timezone.utc)
 
@@ -337,9 +343,14 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=()):
             if not job["job_url"] or job["job_url"] in seen_urls:
                 continue
             watched = is_watched_internship(job, watch, intern_keywords)
+            shared_only = False
             if not watched and not title_matches(job["title"], role_keywords, intern_keywords, exclude_titles):
-                continue
+                shared_only = bool(also and is_internship_title(job["title"], intern_keywords, exclude_titles)
+                                   and also(job["title"]))
+                if not shared_only:
+                    continue
             job["watched"] = watched
+            job["shared_only"] = shared_only
             posted = job["date_posted"]
             if posted is None or now - posted > max_age:
                 continue

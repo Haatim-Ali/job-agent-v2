@@ -146,5 +146,74 @@
   "application_packets": false,
   "watch_internships": [
     "sephora"
-  ]
+  ],
+  "shared_channel": {
+    "_comment": "Read-only alerts for a friend (no tailoring, no reactions). Posts to SHARED_WEBHOOK_URL. Tracks are matched on whole words of the job title (a trailing * matches any ending, e.g. 'product manag*'); Claude then confirms it's a real student internship in that track.",
+    "enabled": true,
+    "tracks": {
+      "Product / Program Management": [
+        "product manag*",
+        "product owner",
+        "apm",
+        "program manag*",
+        "tpm"
+      ],
+      "Technology & Information": [
+        "information technology",
+        "it",
+        "information systems",
+        "information security",
+        "technology analyst",
+        "technology consult*",
+        "tech consult*",
+        "business technology",
+        "technology risk",
+        "business systems",
+        "systems analyst"
+      ],
+      "Data": [
+        "data analy*",
+        "data scien*",
+        "data engineer",
+        "analytics",
+        "business intelligence",
+        "bi",
+        "data"
+      ],
+      "Forward Deployed": [
+        "forward deploy*",
+        "fde",
+        "deployment strategist",
+        "deployed engineer"
+      ],
+      "Solutions": [
+        "solution engineer",
+        "solutions engineer",
+        "solution architect",
+        "solutions architect",
+        "solutions consult*",
+        "solutions analyst",
+        "solutions",
+        "sales engineer",
+        "customer engineer",
+        "implementation engineer",
+        "implementation consult*",
+        "technical account"
+      ]
+    },
+    "search_terms": [
+      "Data Analyst Intern",
+      "Data Science Intern",
+      "Forward Deployed Engineer Intern",
+      "Solutions Engineer Intern",
+      "Information Technology Intern",
+      "Technology Consulting Intern",
+      "Program Manager Intern"
+    ],
+    "search_locations": [
+      "San Francisco Bay Area",
+      "Remote"
+    ],
+    "locations": "San Francisco Bay Area (incl. San Jose, Santa Cruz, Peninsula, East Bay) or remote in the US"
+  }
 }

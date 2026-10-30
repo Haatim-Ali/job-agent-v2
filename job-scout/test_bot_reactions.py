@@ -68,3 +68,14 @@ def test_help_lists_inbox_command():
     bot = pytest.importorskip("bot")
     assert "!inbox" in bot.HELP_TEXT
     assert "assessment" in bot.STATUSES and "closed" in bot.STATUSES
+
+
+def test_only_the_owner_can_trigger_anything(monkeypatch):
+    """A friend added to the server mustn't tailor resumes or log applications for Haatim."""
+    monkeypatch.setattr(bot, "DISCORD_USER_ID", 42)
+    assert bot.is_owner(42) and not bot.is_owner(7)
+
+
+def test_everyone_counts_without_an_owner_id(monkeypatch):
+    monkeypatch.setattr(bot, "DISCORD_USER_ID", 0)
+    assert bot.is_owner(7)

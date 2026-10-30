@@ -250,7 +250,8 @@ A cron job that silently stops is the worst kind of failure: no errors, just no 
 | `DISCORD_CHANNEL_ID` | #job-alerts |
 | `REQUESTS_CHANNEL_ID` | #requests |
 | `APPLICATIONS_CHANNEL_ID` | #applications |
-| `DISCORD_USER_ID` | Your Discord account, for `<@you>` pings |
+| `DISCORD_USER_ID` | Your Discord account, for `<@you>` pings; also the only account whose reactions and messages the bot acts on |
+| `SHARED_WEBHOOK_URL` | Secret URL that posts into the friend's read-only channel (unset = that channel is off) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Path to the Google service-account key file (`~/.config/job-agent/google-sa.json`, permissions 600) |
 | `JOB_TRACKER_SHEET_ID` | Which spreadsheet is the tracker |
 
@@ -459,6 +460,16 @@ Then the job is marked seen. If it came from Greenhouse, Lever or Ashby it's add
 
 **Since 2026-10-26, tailoring runs only when you react 👍 on an alert**, and #job-alerts holds nothing but alerts. Everything a reaction triggers is posted in the **actions channel** (`ACTIONS_CHANNEL_ID` in `.env`, defaulting to #applications, which can be renamed in Discord, e.g. to #reactions, without changing its ID): the "On it" note and the "📎 Tailored resume + cover letter: <role> @ <company>" files from 👍, the "✅ Logged application" note, and the "why are you passing?" question from ❌ (answer it there). Each reply links back to its alert. This applies to a reaction in any channel: ✅ on a 📎 message in #requests also answers in the actions channel. The scraper watchdog's warnings go there too. `bot.reply_channel_id` decides where replies go. (The #requests conversation itself, posting a link and the bot asking what you need, stays in #requests.) (From 2026-10-04 to 10-26 every alert was tailored automatically and the files posted under it in #job-alerts; that is `tailor_alerts`, still in `scraper.py`, behind `tailor_every_alert`, now `false` in `scraper_config.json`.)
 
+## The friend's read-only channel (since 2026-10-30)
+
+A second channel gets **PM, technology & information (IT), data, forward deployed and solutions internships** for a friend, with nothing to react to: each card is the posting, its link and a one-line summary. No resume tailoring, no `<@>` pings, no reaction legend. It's configured under `shared_channel` in `scraper_config.json` and posts through its own webhook, `SHARED_WEBHOOK_URL` in `.env` (unset means the channel is off).
+
+- **Tracks** are keyword lists matched on whole words of the title (`shared_track`; a trailing `*` matches any ending, so `product manag*` covers "Management" and "Manager"). Short words like `it` and `data` only match on their own, so "Security" and "Database" don't count.
+- **Finding jobs.** Every job in your normal pipeline whose title is in a track is also checked for this channel. On top of that, the channel has its own LinkedIn searches (`search_terms` in `search_locations`, run after yours) and career-site postings that match a track but none of your `role_keywords`. Those extra jobs are marked `shared_only` and **skip your scoring**, so #job-alerts gets exactly what it got before. A shared search result that isn't in any track is dropped before the page fetch.
+- **The check** (`shared_relevance_check`) is not scored against anyone's resume. Claude Haiku only confirms it's a real student internship or co-op, mainly in one of the tracks, in `locations` (Bay Area or US remote), and asking for under 3 years of experience, and writes the summary.
+- **No double posts.** Both checks run before either channel gets anything; if either hits an API error the job stays unseen and both are retried next run.
+- **Discord side.** The channel denies Send Messages and Add Reactions to everyone but you, and the bot ignores it anyway (it isn't in `bot_channels`). Separately, the bot now acts only on reactions and messages from `DISCORD_USER_ID` (`bot.is_owner`), so a friend in the server can't tailor resumes on your API credits or mark jobs applied in your tracker.
+
 # Part 5: The Discord bot (`bot.py`)
 
 ## How a Discord bot works
@@ -472,7 +483,7 @@ The bot is built with **discord.py**, which is **asynchronous**: it runs an **ev
 ## Events the bot handles
 
 - **`on_ready`**: logged in; writes "Bot online" to the log.
-- **`on_raw_reaction_add`**: a reaction was added anywhere. The "raw" version fires even for messages the bot hasn't cached (for example alerts posted before its last restart), which is why it's used instead of `on_reaction_add`. It ignores the bot's own reactions and any channel other than #job-alerts and #requests.
+- **`on_raw_reaction_add`**: a reaction was added anywhere. The "raw" version fires even for messages the bot hasn't cached (for example alerts posted before its last restart), which is why it's used instead of `on_reaction_add`. It ignores the bot's own reactions, anyone other than you (`DISCORD_USER_ID`, since 2026-10-30), and any channel other than #job-alerts, #requests and the actions channel.
 - **`on_message`**: any new message; used for commands (`!...`), dismissal reasons, and #requests conversations.
 
 **Emoji normalization.** 👍🏽 is actually two Unicode characters: 👍 plus a **skin-tone modifier** (U+1F3FB to U+1F3FF). Some keyboards also add an invisible **variation selector** (U+FE0F). `normalize_emoji` strips both, so every variant counts as 👍.
@@ -1039,6 +1050,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-30: read-only channel for a friend.** New `shared_channel` config and `SHARED_WEBHOOK_URL`: PM, IT, data, forward deployed and solutions internships go to a separate channel as plain posting cards (no tailoring, reactions or pings). Track matching on title words, a Claude Haiku check that it's a real student internship in the Bay Area or remote, 7 extra LinkedIn searches in 2 locations, career-site postings in those tracks (`career_sites.fetch_all(also=...)`). Jobs found only for that channel skip Haatim's scoring. The bot now acts only on `DISCORD_USER_ID`'s reactions and messages. `claude_relevance_check`'s error handling moved into `_score_failure`, the LinkedIn loop into `search_linkedin`, the age math into `age_hours`. 30 tests added.
 
 **2026-10-29: inbox check for htali@ucsc.edu.** New `email_scan.py`: read-only Gmail API access, Claude Haiku labels each recruiting email, `sheets_sync.record_email` updates the matching Applications row (never backwards; asks when several roles could match), summary in #reactions, `!inbox` command, cron twice a day. 15 tests added. `PRIVACY.md` added for the Google sign-in screen (production mode needs a privacy policy link). First backfill: 324 emails since August; added Amazon, Scale AI, Veeam, xAI, GALLO (2 rejections), 3 IBM roles, NVIDIA World Models; marked Amazon, IBM (2) and Clay rejected.
 
