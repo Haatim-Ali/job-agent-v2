@@ -308,3 +308,152 @@ class TestSephoraWatch:
 
     def test_rss_date(self):
         assert cs._parse_dt("Tue, 06 Oct 2026 2:00:00 GMT").day == 6
+
+
+class _Resp:
+    def __init__(self, data, status=200):
+        self.data, self.status_code = data, status
+
+    def json(self):
+        return self.data
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise cs.requests.HTTPError(f"{self.status_code}")
+
+
+def _ago(hours):
+    return (datetime.now(timezone.utc) - cs.timedelta(hours=hours)).isoformat()
+
+
+class TestMoreBoards:
+    """2026-10-31: ~150 more companies, Eightfold (Netflix, Qualcomm), lighter Greenhouse fetch."""
+
+    def test_greenhouse_fetches_descriptions_only_for_fresh_internships(self, monkeypatch):
+        urls = []
+
+        def get(url, **kw):
+            urls.append(url)
+            if url.endswith("/jobs"):
+                return _Resp({"jobs": [
+                    {"id": 1, "title": "Software Engineer Intern", "first_published": _ago(5),
+                     "absolute_url": "https://x/1", "location": {"name": "Hawthorne, CA"}, "company_name": "SpaceX"},
+                    {"id": 2, "title": "Software Engineer Intern", "first_published": _ago(500), "absolute_url": "https://x/2"},
+                    {"id": 3, "title": "Internal Tools Engineer", "first_published": _ago(5), "absolute_url": "https://x/3"},
+                ]})
+            return _Resp({"content": "&lt;p&gt;Build rockets&lt;/p&gt;"})
+
+        monkeypatch.setattr(cs.requests, "get", get)
+        jobs = cs.fetch_greenhouse("spacex", max_age_hours=72)
+        assert [j["job_url"] for j in jobs] == ["https://x/1"]
+        assert jobs[0]["description"] == "Build rockets" and jobs[0]["company"] == "SpaceX"
+        assert "content" not in str(urls[0]) and urls[1].endswith("/jobs/1")   # list is fetched without bodies
+
+    def test_greenhouse_keeps_posting_when_description_fails(self, monkeypatch):
+        def get(url, **kw):
+            if url.endswith("/jobs"):
+                return _Resp({"jobs": [{"id": 1, "title": "SWE Intern", "first_published": _ago(1), "absolute_url": "https://x/1"}]})
+            return _Resp({}, status=500)
+        monkeypatch.setattr(cs.requests, "get", get)
+        jobs = cs.fetch_greenhouse("b")
+        assert len(jobs) == 1 and jobs[0]["description"] == "" and jobs[0]["company"] == "B"
+
+    def test_workday_uses_configured_company_name(self, monkeypatch):
+        monkeypatch.setattr(cs.requests, "post", lambda *a, **k: _Resp({"jobPostings": [
+            {"title": "Systems Software Intern", "postedOn": "Posted Today", "externalPath": "/job/1", "locationsText": "San Jose, CA"},
+            {"title": "International Sales Executive", "postedOn": "Posted Today", "externalPath": "/job/2"}]}))
+        monkeypatch.setattr(cs.requests, "get", lambda *a, **k: _Resp({"jobPostingInfo": {"jobDescription": "<p>Hi</p>"}}))
+        jobs = cs.fetch_workday("sec|wd3|Samsung_Careers|Samsung", pages=1)
+        assert [j["title"] for j in jobs] == ["Systems Software Intern"]
+        assert jobs[0]["company"] == "Samsung" and jobs[0]["board"] == "sec|wd3|Samsung_Careers"
+        assert cs.fetch_workday("nvidia|wd5|Site", pages=1)[0]["company"] == "Nvidia"   # no name: tenant
+
+    def test_unique_workday_prefers_configured_name(self):
+        assert cs._unique_workday(["sec|wd3|Samsung_Careers|Samsung", "sec|wd3|Samsung_Careers", "kla|wd1|Search"]) == \
+            ["sec|wd3|Samsung_Careers|Samsung", "kla|wd1|Search"]
+
+    def test_eightfold_apply_v2(self, monkeypatch):
+        """Netflix: pcsx is disabled (403), the older apply/v2 API works."""
+        now = datetime.now(timezone.utc).timestamp()
+
+        def get(url, params=None, **kw):
+            if "/pcsx/" in url:
+                return _Resp({"message": "PCSX is not enabled"}, status=403)
+            if url.endswith("/apply/v2/jobs"):
+                return _Resp({"count": 2, "positions": [
+                    {"id": 7, "name": "Software Engineer Intern - Summer 2027", "t_create": now,
+                     "locations": ["Los Gatos,California,United States of America"],
+                     "canonicalPositionUrl": "https://explore.jobs.netflix.net/careers/job/7"},
+                    {"id": 8, "name": "Senior Manager, Internal Communications", "t_create": now}]})
+            assert url.endswith("/apply/v2/jobs/7")
+            return _Resp({"job_description": "<p>Stream things</p>"})
+
+        monkeypatch.setattr(cs.requests, "get", get)
+        jobs = cs.fetch_eightfold("Netflix|explore.jobs.netflix.net|netflix.com")
+        assert len(jobs) == 1
+        j = jobs[0]
+        assert j["company"] == "Netflix" and j["site"] == "eightfold" and j["description"] == "Stream things"
+        assert j["job_url"] == "https://explore.jobs.netflix.net/careers/job/7" and "Los Gatos" in j["location"]
+
+    def test_eightfold_pcsx(self, monkeypatch):
+        """Qualcomm: the pcsx search API, with relative position URLs."""
+        now = datetime.now(timezone.utc).timestamp()
+
+        def get(url, params=None, **kw):
+            if url.endswith("/pcsx/search"):
+                return _Resp({"data": {"count": 1, "positions": [
+                    {"id": 5, "name": "FY27 Intern - AI Software Engineering", "postedTs": now,
+                     "locations": ["San Diego, California, United States"], "positionUrl": "/careers/job/5"}]}})
+            assert url.endswith("/pcsx/position_details") and params["position_id"] == 5
+            return _Resp({"data": {"jobDescription": "<p>Chips</p>"}})
+
+        monkeypatch.setattr(cs.requests, "get", get)
+        jobs = cs.fetch_eightfold("Qualcomm|careers.qualcomm.com|qualcomm.com")
+        assert [(j["title"], j["job_url"], j["description"]) for j in jobs] == [
+            ("FY27 Intern - AI Software Engineering", "https://careers.qualcomm.com/careers/job/5", "Chips")]
+
+    def test_fetch_all_runs_eightfold_and_survives_a_failing_board(self, monkeypatch):
+        now = datetime.now(timezone.utc)
+        job = cs._job("Software Engineer Intern", "Netflix", "Los Gatos, CA", "https://n/1", "", now, "eightfold")
+        monkeypatch.setattr(cs, "fetch_eightfold", lambda spec, max_age_hours=72: [job])
+
+        def boom(board, max_age_hours=72):
+            raise cs.requests.ConnectionError("down")
+        monkeypatch.setattr(cs, "fetch_greenhouse", boom)
+        cfg = {"greenhouse": ["broken"], "eightfold": ["Netflix|h|netflix.com"], "simplify": False}
+        out = cs.fetch_all(cfg, _CFG["role_keywords"], _CFG["intern_keywords"], _CFG["career_site_exclude_titles"])
+        assert [j["job_url"] for j in out] == ["https://n/1"]
+
+    def test_config_has_the_new_companies(self):
+        sites = _CFG["career_sites"]
+        assert "nintendo" in sites["greenhouse"] and "spacex" in sites["greenhouse"]
+        assert any(e.startswith("Netflix|") for e in sites["eightfold"])
+        assert all(len(w.split("|")) in (3, 4) for w in sites["workday"])
+        assert "United States" in _CFG["locations"]
+
+    def test_eightfold_stops_paging_at_old_postings_and_on_rate_limit(self, monkeypatch):
+        now = datetime.now(timezone.utc).timestamp()
+        calls = []
+
+        def get(url, params=None, **kw):
+            calls.append(params.get("start"))
+            if url.endswith("/pcsx/search"):
+                if params["start"] == 0 and len(calls) > 1 and calls.count(0) > 1:
+                    return _Resp({"data": {"count": 99, "positions": [
+                        {"id": i, "name": "SWE Intern", "postedTs": now, "positionUrl": f"/j/{i}"} for i in range(10)]}})
+                if params["start"] == 10:
+                    return _Resp({}, status=429)
+                return _Resp({"data": {"count": 99, "positions": []}})
+            return _Resp({"data": {}})
+
+        monkeypatch.setattr(cs.requests, "get", get)
+        assert len(cs.fetch_eightfold("Q|h|q.com")) == 10   # page 2 was rate-limited: keep page 1
+
+        def get_old(url, params=None, **kw):
+            if url.endswith("/pcsx/search"):
+                return _Resp({"data": {"count": 99, "positions": [
+                    {"id": 1, "name": "SWE Intern", "postedTs": now - 3600 * 24 * 30, "positionUrl": "/j/1"}]}})
+            raise AssertionError("no details for stale postings")
+        pages = []
+        monkeypatch.setattr(cs.requests, "get", lambda url, params=None, **kw: pages.append(params["start"]) or get_old(url, params))
+        assert cs.fetch_eightfold("Q|h|q.com") == [] and pages == [0, 0]   # probe + one page, then stop

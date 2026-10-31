@@ -1,14 +1,15 @@
 """
 Career-site sources: pull postings straight from company job boards instead of LinkedIn.
 
-Greenhouse, Lever, Ashby and SmartRecruiters expose public JSON job boards; Workday career
-sites call a hidden JSON API; Amazon has its own search JSON; SimplifyJobs publishes the
+Greenhouse, Lever, Ashby and SmartRecruiters expose public JSON job boards; Workday and
+Eightfold career sites call hidden JSON APIs; Amazon has its own search JSON; SimplifyJobs publishes the
 community-curated Summer 2027 internship list as one JSON file.
 Each fetcher returns job dicts shaped like a JobSpy row so scraper.process_jobs() can use them.
 """
 
 import logging
 import re
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 
 import requests
@@ -64,19 +65,32 @@ def _job(title, company, location, url, description, posted, site, board=""):
     }
 
 
-def fetch_greenhouse(board):
-    resp = requests.get(
-        f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs",
-        params={"content": "true"}, headers=HEADERS, timeout=TIMEOUT,
-    )
+_MAYBE_INTERN = re.compile(r"\b(intern|interns|internship|co-?op|student)\b", re.I)
+
+
+def fetch_greenhouse(board, max_age_hours=72):
+    """The board's job list without descriptions (SpaceX's and Anduril's are 30-45 MB with them),
+    then one request per fresh internship-looking posting for its description. Titles are
+    filtered properly in fetch_all; postings skipped here would be dropped there anyway."""
+    base = f"https://boards-api.greenhouse.io/v1/boards/{board}/jobs"
+    resp = requests.get(base, headers=HEADERS, timeout=TIMEOUT)
     resp.raise_for_status()
-    jobs = []
+    jobs, cutoff = [], datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
     for j in resp.json().get("jobs", []):
+        posted = _parse_dt(j.get("first_published") or j.get("updated_at"))
+        if posted is None or posted < cutoff or not _MAYBE_INTERN.search(j.get("title", "")):
+            continue
+        desc = ""
+        try:
+            detail = requests.get(f"{base}/{j['id']}", headers=HEADERS, timeout=TIMEOUT)
+            detail.raise_for_status()
+            desc = _html_to_text(detail.json().get("content"))
+        except (requests.RequestException, ValueError, KeyError):
+            pass
         company = j.get("company_name") or board.title()
         jobs.append(_job(
             j.get("title", ""), company, (j.get("location") or {}).get("name", ""),
-            j.get("absolute_url", ""), _html_to_text(j.get("content")),
-            _parse_dt(j.get("first_published") or j.get("updated_at")), "greenhouse", board,
+            j.get("absolute_url", ""), desc, posted, "greenhouse", board,
         ))
     return jobs
 
@@ -167,7 +181,9 @@ def smartrecruiters_description(company, posting_id):
 
 
 # Workday: "<tenant>|<wd host>|<site>", from a careers URL like
-# https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite -> "nvidia|wd5|NVIDIAExternalCareerSite"
+# https://nvidia.wd5.myworkdayjobs.com/NVIDIAExternalCareerSite -> "nvidia|wd5|NVIDIAExternalCareerSite",
+# optionally followed by "|<Company name>" when the tenant is cryptic ("sec|wd3|Samsung_Careers|Samsung").
+# The posting's own hiringOrganization is a legal entity ("0090 CORP-Corporate Office"), so it isn't used.
 _WORKDAY_AGE = re.compile(r"(\d+)\+? Days? Ago", re.I)
 
 
@@ -187,7 +203,9 @@ def fetch_workday(spec, pages=5, max_age_hours=72):
     """Workday's career-site JSON API (no key needed). Descriptions need a second request per
     job, so they're fetched only for fresh postings whose title matches the role filter
     (titles are filtered again in fetch_all)."""
-    tenant, wd, site = spec.split("|")
+    tenant, wd, site, *name = spec.split("|")
+    company = name[0] if name else tenant.title()
+    spec = f"{tenant}|{wd}|{site}"
     base = f"https://{tenant}.{wd}.myworkdayjobs.com/wday/cxs/{tenant}/{site}"
     headers = {**HEADERS, "Content-Type": "application/json", "Accept": "application/json"}
     jobs, cutoff = [], datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
@@ -198,7 +216,7 @@ def fetch_workday(spec, pages=5, max_age_hours=72):
         postings = resp.json().get("jobPostings", [])
         for j in postings:
             posted = _workday_posted(j.get("postedOn"))
-            if posted is None or posted < cutoff or not re.search(r"\bintern", j.get("title", ""), re.I):
+            if posted is None or posted < cutoff or not _MAYBE_INTERN.search(j.get("title", "")):
                 continue
             desc = ""
             try:
@@ -207,12 +225,71 @@ def fetch_workday(spec, pages=5, max_age_hours=72):
             except (requests.RequestException, ValueError, KeyError):
                 pass
             jobs.append(_job(
-                j.get("title", ""), tenant.title(), j.get("locationsText", ""),
+                j.get("title", ""), company, j.get("locationsText", ""),
                 f"https://{tenant}.{wd}.myworkdayjobs.com/{site}{j.get('externalPath', '')}", desc,
                 posted, "workday", spec,
             ))
         if len(postings) < 20:
             break
+    return jobs
+
+
+def _eightfold_get(url, params):
+    resp = requests.get(url, params=params, headers=HEADERS, timeout=TIMEOUT)
+    resp.raise_for_status()
+    return resp.json()
+
+
+def fetch_eightfold(spec, pages=5, max_age_hours=72):
+    """Eightfold career sites (Netflix, Qualcomm). spec: "Company|careers host|domain", e.g.
+    "Netflix|explore.jobs.netflix.net|netflix.com". Eightfold has two public APIs and each site
+    enables only one: the newer "pcsx" search (Qualcomm) or the older apply/v2 (Netflix).
+    Descriptions are fetched only for fresh internship-looking postings."""
+    company, host, domain = spec.split("|")
+    root = f"https://{host}/api"
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    try:
+        _eightfold_get(f"{root}/pcsx/search", {"domain": domain, "query": "intern", "start": 0})
+        pcsx = True
+    except requests.HTTPError:
+        pcsx = False
+    jobs, start = [], 0
+    for page in range(pages):
+        try:
+            if pcsx:
+                data = _eightfold_get(f"{root}/pcsx/search", {"domain": domain, "query": "intern",
+                                                              "start": start, "sort_by": "timestamp"})["data"]
+            else:
+                data = _eightfold_get(f"{root}/apply/v2/jobs", {"domain": domain, "query": "intern",
+                                                                "start": start, "num": 50, "sort_by": "new"})
+        except requests.HTTPError:
+            if page == 0:
+                raise
+            break   # Qualcomm rate-limits quick paging (429); keep the newest pages already read
+        positions = data.get("positions") or []
+        stale = False
+        for p in positions:
+            posted = _parse_dt(p.get("postedTs") if pcsx else p.get("t_create"))
+            stale = stale or (posted is not None and posted < cutoff)
+            if posted is None or posted < cutoff or not _MAYBE_INTERN.search(p.get("name", "")):
+                continue
+            desc = ""
+            try:
+                if pcsx:
+                    info = _eightfold_get(f"{root}/pcsx/position_details",
+                                          {"position_id": p["id"], "domain": domain, "hl": "en"}).get("data") or {}
+                    desc = _html_to_text(info.get("jobDescription"))
+                else:
+                    desc = _html_to_text(_eightfold_get(f"{root}/apply/v2/jobs/{p['id']}",
+                                                        {"domain": domain}).get("job_description"))
+            except (requests.RequestException, ValueError, KeyError):
+                pass
+            url = p.get("canonicalPositionUrl") or f"https://{host}{p.get('positionUrl', '')}"
+            location = "; ".join(p.get("locations") or []) or p.get("location", "")
+            jobs.append(_job(p.get("name", ""), company, location, url, desc, posted, "eightfold", spec))
+        start += len(positions)
+        if not positions or stale or start >= (data.get("count") or 0):
+            break   # newest first, so a page reaching past the age window is the last one needed
     return jobs
 
 
@@ -312,6 +389,18 @@ def is_watched_internship(job, watch, intern_keywords):
     return any(re.search(rf"\b{re.escape(k)}s?\b", t) for k in intern_keywords)
 
 
+def _unique_workday(specs):
+    """Drop a Workday spec whose tenant/site is already listed (a learned board has no company
+    name, so it can repeat a configured one). The first, i.e. configured, spelling wins."""
+    seen, out = set(), []
+    for spec in specs:
+        key = "|".join(spec.split("|")[:3]).lower()
+        if key not in seen:
+            seen.add(key)
+            out.append(spec)
+    return out
+
+
 def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=(), also=None):
     """Return recent, title-matching postings from every configured career site. Internships at
     watched companies are kept whatever the role, and marked job["watched"] = True.
@@ -320,23 +409,34 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=(), als
     max_age = timedelta(hours=cfg.get("max_age_hours", 72))
     now = datetime.now(timezone.utc)
 
+    aged = {"max_age_hours": cfg.get("max_age_hours", 72)}   # these filter by age before fetching descriptions
     sources = (
-        [(fetch_greenhouse, b) for b in cfg.get("greenhouse", [])]
-        + [(fetch_lever, c) for c in cfg.get("lever", [])]
-        + [(fetch_ashby, b) for b in cfg.get("ashby", [])]
-        + [(fetch_smartrecruiters, c) for c in cfg.get("smartrecruiters", [])]
-        + [(fetch_workday, w) for w in cfg.get("workday", [])]
-        + [(fetch_successfactors, s) for s in cfg.get("successfactors", [])]
-        + [(fetch_amazon, q) for q in cfg.get("amazon_queries", [])]
-        + ([(lambda _: fetch_simplify(), "simplify")] if cfg.get("simplify", True) else [])
+        [(fetch_greenhouse, b, aged) for b in cfg.get("greenhouse", [])]
+        + [(fetch_lever, c, {}) for c in cfg.get("lever", [])]
+        + [(fetch_ashby, b, {}) for b in cfg.get("ashby", [])]
+        + [(fetch_smartrecruiters, c, {}) for c in cfg.get("smartrecruiters", [])]
+        + [(fetch_workday, w, aged) for w in _unique_workday(cfg.get("workday", []))]
+        + [(fetch_successfactors, s, {}) for s in cfg.get("successfactors", [])]
+        + [(fetch_eightfold, e, aged) for e in cfg.get("eightfold", [])]
+        + [(fetch_amazon, q, {}) for q in cfg.get("amazon_queries", [])]
+        + ([(lambda _: fetch_simplify(), "simplify", {})] if cfg.get("simplify", True) else [])
     )
 
-    results, seen_urls = [], set()
-    for fetch, arg in sources:
+    def run(source):
+        fetch, arg, kwargs = source
         try:
-            jobs = fetch(arg)
+            return fetch(arg, **kwargs)
         except Exception as e:
             logging.warning(f"Career site {getattr(fetch, '__name__', 'source')}({arg}) failed: {e}")
+            return None
+
+    # ~200 boards: fetched in parallel (each is a different host or board), results kept in config order
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        fetched = list(pool.map(run, sources))
+
+    results, seen_urls = [], set()
+    for (fetch, arg, _), jobs in zip(sources, fetched):
+        if jobs is None:
             continue
         kept = 0
         for job in jobs:

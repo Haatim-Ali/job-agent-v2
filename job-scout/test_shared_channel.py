@@ -125,7 +125,7 @@ class TestCareerSites:
         jobs = [{"title": t, "company": "Co", "job_url": f"https://y/{i}", "date_posted": now - timedelta(hours=1)}
                 for i, t in enumerate(["Software Engineer Intern", "Solutions Architect Intern",
                                        "Solutions Architect", "Senior Solutions Intern", "Barista Intern"])]
-        monkeypatch.setattr(cs, "fetch_greenhouse", lambda board: [dict(j) for j in jobs])
+        monkeypatch.setattr(cs, "fetch_greenhouse", lambda board, **kw: [dict(j) for j in jobs])
         also = lambda title: "solutions" in title.lower()
         got = cs.fetch_all({"greenhouse": ["co"], "simplify": False}, ["software"], ["intern"], ["senior"], also=also)
         assert [(j["title"], j["shared_only"]) for j in got] == [

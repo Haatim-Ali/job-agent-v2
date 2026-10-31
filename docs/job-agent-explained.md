@@ -266,7 +266,7 @@ A cron job that silently stops is the worst kind of failure: no errors, just no 
 Every search term is paired with every location:
 
 - **11 search terms:** Software Engineer Intern, Software Development Intern, AI Engineer Intern, Machine Learning Engineer Intern, Applied AI Intern, Applied ML Intern, AI Research Intern, Agentic AI Intern, Research Intern, Product Manager Intern, Technical Product Manager Intern.
-- **4 locations:** San Jose, Santa Cruz, San Francisco, Remote.
+- **4 locations:** United States, San Jose, San Francisco, Remote. (Until 2026-10-31 it was San Jose, Santa Cruz, San Francisco, Remote; "United States" replaced Santa Cruz when Haatim opened the search to anywhere in the US. The two Bay Area searches stay so local postings aren't crowded out of the nationwide search's 40 results.)
 - **44 searches per run**, each asking for up to 40 results posted in the last 24 hours with `job_type="internship"`. "Remote" is sent as location "United States" with the remote flag. There's a 2-second pause between searches (`time.sleep(2)`) to avoid hammering LinkedIn.
 
 LinkedIn's terms of service prohibit scraping, so JobSpy's requests can be rate-limited or blocked by IP. That's a reason the career-site sources below were added. LinkedIn also hides a posting's real application link behind a sign-in, so LinkedIn alerts get packets only when the same role can be found on the company's own job board (see "Finding LinkedIn jobs on the company's own board" in Part 6).
@@ -277,12 +277,13 @@ Many companies don't host their own job pages; they use an **ATS** (applicant tr
 
 | ATS | Endpoint | Companies configured |
 |---|---|---|
-| Greenhouse | `boards-api.greenhouse.io/v1/boards/<board>/jobs?content=true` | 20: Stripe, Databricks, Roblox, Figma, Anthropic, Cloudflare, Reddit, Discord, Airbnb, Coinbase, Robinhood, Dropbox, Pinterest, Lyft, Instacart, Datadog, Samsara, Scale AI, Asana, Affirm |
-| Lever | `api.lever.co/v0/postings/<company>?mode=json` | 2: Palantir, Spotify |
-| Ashby | `api.ashbyhq.com/posting-api/job-board/<board>` | 5: OpenAI, Notion, Ramp, Linear, Perplexity |
+| Greenhouse | `boards-api.greenhouse.io/v1/boards/<board>/jobs`, then `.../jobs/<id>` for each fresh internship | 81: big tech and startups (Stripe, Databricks, Figma, Anthropic, Cloudflare, Airbnb, DoorDash, MongoDB, Twilio, Pinterest, Lyft, Robinhood…), games (Nintendo, Epic Games, Riot, Bungie, PlayStation, Rockstar, 2K, Naughty Dog, Insomniac, Crystal Dynamics, Scopely, Twitch), autonomy and hardware (SpaceX, xAI, Anduril, Waymo, Nuro, Kodiak, Neuralink, Samsung Semiconductor, HP, Axon), AI (Together AI, SambaNova, Scale AI) and trading firms (Jane Street, Hudson River Trading, Jump, Optiver, IMC, Point72, Tower, Akuna) |
+| Lever | `api.lever.co/v0/postings/<company>?mode=json` | 5: Palantir, Spotify, Zoox, Shield AI, Waabi |
+| Ashby | `api.ashbyhq.com/posting-api/job-board/<board>` | 25: OpenAI, Notion, Ramp, Linear, Perplexity, Cohere, Cursor, Replit, Harvey, Sierra, Cognition, ElevenLabs, Snowflake, Supabase, Baseten, Modal, Crusoe, Lambda and others |
 | Amazon | `amazon.jobs/en/search.json` | 4 queries: SDE intern, ML intern, data science intern, PM intern |
-| SmartRecruiters | `api.smartrecruiters.com/v1/companies/<id>/postings?q=intern` | none configured; learned boards are added automatically |
-| Workday | `POST <tenant>.<wd>.myworkdayjobs.com/wday/cxs/<tenant>/<site>/jobs` | NVIDIA (`nvidia\|wd5\|NVIDIAExternalCareerSite`) |
+| SmartRecruiters | `api.smartrecruiters.com/v1/companies/<id>/postings?q=intern` | 5: ServiceNow, Canva, LinkedIn, Western Digital, Ubisoft |
+| Workday | `POST <tenant>.<wd>.myworkdayjobs.com/wday/cxs/<tenant>/<site>/jobs` | 50: NVIDIA, Salesforce, Adobe, Intel, Cisco, PayPal, Workday, HP, HPE, Snap, Visa, Mastercard, Disney, Warner Bros. Discovery, Sony, Samsung, KLA, Applied Materials, Micron, ASML, Marvell, CrowdStrike, T-Mobile, Verizon, AT&T, GM, Boeing, Northrop Grumman, RTX, Capital One, Walmart, Zillow, eBay, Expedia and more |
+| Eightfold | `GET <host>/api/pcsx/search` or `/api/apply/v2/jobs` | 3: Netflix, Qualcomm, Boston Scientific |
 | SimplifyJobs list | `raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/.github/scripts/listings.json` | one file covering thousands of companies |
 
 The `<board>` part is a **slug**: a short, URL-safe name for the company on that ATS (`figma`, `scaleai`).
@@ -300,9 +301,15 @@ This is the same shape a JobSpy row has, so everything downstream (`process_jobs
 
 ### Workday, SmartRecruiters and the SimplifyJobs list (added 2026-10-01)
 
-- **Workday** (used by NVIDIA, Capital One and many large companies) has no documented public API, but its career sites are JavaScript apps that call a JSON API anyone can call: a `POST` to `/wday/cxs/<tenant>/<site>/jobs` with a search text ("intern") returns 20 postings per page with a title, location and a relative date like "Posted 3 Days Ago" (`_workday_posted` turns that into a timestamp). Descriptions need a second request per job, so they're fetched only for fresh postings with "intern" in the title. A board is written `tenant|wd-host|site`, read straight off the careers URL.
+- **Workday** (used by NVIDIA, Capital One and many large companies) has no documented public API, but its career sites are JavaScript apps that call a JSON API anyone can call: a `POST` to `/wday/cxs/<tenant>/<site>/jobs` with a search text ("intern") returns 20 postings per page with a title, location and a relative date like "Posted 3 Days Ago" (`_workday_posted` turns that into a timestamp). Descriptions need a second request per job, so they're fetched only for fresh postings with "intern" in the title. A board is written `tenant|wd-host|site`, read straight off the careers URL, optionally followed by `|Company name` because tenants can be cryptic (`sec` is Samsung, `ngc` Northrop Grumman, `globalhr` RTX). The posting's own `hiringOrganization` isn't used: it's a legal entity such as "0090 CORP-Corporate Office". `_unique_workday` drops a learned board that repeats a configured one.
 - **SmartRecruiters** has a documented, unauthenticated Posting API. The company id is the first path segment of a `jobs.smartrecruiters.com/<id>/...` link.
 - **[SimplifyJobs Summer 2027 Internships](https://github.com/SimplifyJobs/Summer2027-Internships)** is a community-maintained list (about 17,000 listings, around 4,400 open on 2026-10-01) that Simplify keeps fresh by scraping company career pages hourly. The bot downloads its `listings.json` once per run and keeps listings that are open, visible and not graduate-only (degrees listed as only Master's/PhD/MBA). It has no descriptions, so Claude scores these on title, company, locations and the listing's metadata (term, category, degrees, sponsorship), and the 📋 flag marks them in Discord. `_ats_from_url` recognizes when a listing's link is on Greenhouse, Lever, Ashby, SmartRecruiters or Workday; Greenhouse, Lever and Ashby ones get application packets like any career-site job. In the first trial, 159 of 3,738 open listings passed the title and age filters.
+
+- **Eightfold** (added 2026-10-31; Netflix, Qualcomm, Boston Scientific) runs career sites with two public JSON APIs, and each site enables only one: the newer `pcsx` search (Qualcomm, Boston Scientific) or the older `apply/v2` (Netflix, whose `pcsx` answers 403). `fetch_eightfold` probes `pcsx` and falls back. Results are sorted newest first, so paging stops at the first page that reaches past the 72-hour window; Qualcomm rate-limits quick paging (HTTP 429), and a 429 after the first page keeps what was read. A board is written `Company|careers host|domain`. Microsoft's Eightfold site refuses automated requests, so Microsoft isn't configured; its postings arrive through LinkedIn and Simplify.
+
+- **Greenhouse without bodies** (2026-10-31). The job list used to be fetched with `?content=true`, which is 33 MB for SpaceX and 45 MB for Anduril. Now the list comes without descriptions (2.7 MB for SpaceX) and `fetch_greenhouse` requests `/jobs/<id>` only for postings published within the age window whose title says intern, internship, co-op or student.
+
+- **In parallel** (2026-10-31). With about 175 boards, `fetch_all` fetches them 8 at a time in a thread pool and then processes the results in config order. A live run of every board took 52 seconds.
 
 - **SAP SuccessFactors** (Sephora's jobs.sephora.com, and many large companies) publishes an RSS feed of its 20 newest postings with full descriptions at `/services/rss/job/`; `fetch_successfactors` reads it (configured as `"Company|https://jobs.example.com"`).
 
@@ -1050,6 +1057,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-10-31: ~150 more companies, nationwide search.** Haatim asked for postings from all good companies, not just the Bay Area. `candidate_profile.yaml` locations are now anywhere in the US or US remote (only non-US is a mismatch), and the LinkedIn locations swap Santa Cruz for United States. Boards checked live and added: Greenhouse 20 → 81 (Nintendo, Epic, Riot, SpaceX, Waymo, trading firms…), Lever 2 → 5, Ashby 5 → 25, SmartRecruiters 0 → 5, Workday 1 → 50 (with company names), and a new Eightfold adapter for Netflix, Qualcomm and Boston Scientific. Greenhouse lists are fetched without descriptions, and boards are fetched 8 at a time. Not covered directly (custom sites; still found through LinkedIn and Simplify): Google, Apple, Meta, Microsoft, Tesla, AMD, EA, Docusign and Oracle-hosted sites (Emerson, Dell, TI, Honeywell). 9 tests added.
 
 **2026-10-30: read-only channel for a friend.** New `shared_channel` config and `SHARED_WEBHOOK_URL`: PM, IT, data, forward deployed and solutions internships go to a separate channel as plain posting cards (no tailoring, reactions or pings). Track matching on title words, a Claude Haiku check that it's a real student internship in the Bay Area or remote, 7 extra LinkedIn searches in 2 locations, career-site postings in those tracks (`career_sites.fetch_all(also=...)`). Jobs found only for that channel skip Haatim's scoring. The bot now acts only on `DISCORD_USER_ID`'s reactions and messages. `claude_relevance_check`'s error handling moved into `_score_failure`, the LinkedIn loop into `search_linkedin`, the age math into `age_hours`. 30 tests added.
 
