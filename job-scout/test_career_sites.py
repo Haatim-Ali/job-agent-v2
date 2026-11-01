@@ -457,3 +457,94 @@ class TestMoreBoards:
         pages = []
         monkeypatch.setattr(cs.requests, "get", lambda url, params=None, **kw: pages.append(params["start"]) or get_old(url, params))
         assert cs.fetch_eightfold("Q|h|q.com") == [] and pages == [0, 0]   # probe + one page, then stop
+
+
+class TestEveryBoard:
+    """2026-11-01: every company board behind the Simplify list, plus Oracle, Workable, Rippling."""
+
+    def test_board_from_listing(self):
+        f = cs.board_from_listing
+        assert f("https://job-boards.greenhouse.io/truveta/jobs/1", "Truveta") == ("greenhouse", "truveta")
+        assert f("https://sec.wd3.myworkdayjobs.com/Samsung_Careers/job/x", "Samsung") == \
+            ("workday", "sec|wd3|Samsung_Careers|Samsung")
+        assert f("https://wd3.myworkdaysite.com/recruiting/magna/Magna/job/Troy/Intern_R1", "Magna") == \
+            ("workday", "magna|wd3|Magna|Magna")
+        assert f("https://hdjq.fa.us2.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/2026", "Emerson") == \
+            ("oracle", "Emerson|hdjq.fa.us2.oraclecloud.com|CX_1")
+        assert f("https://apply.workable.com/eluvio/j/ABC123/apply", "Eluvio") == ("workable", "eluvio")
+        assert f("https://apply.workable.com/j/ABC123", "X") is None
+        assert f("https://ats.rippling.com/foundation-robotics/jobs/6a54", "Foundation") == ("rippling", "foundation-robotics")
+        assert f("https://www.tesla.com/careers/search/job/1", "Tesla") is None
+
+    def test_harvest_dedupes_boards_across_listings(self):
+        listings = [{"url": "https://jobs.lever.co/zoox/1", "company_name": "Zoox"},
+                    {"url": "https://jobs.lever.co/zoox/2", "company_name": "Zoox"},
+                    {"url": "https://sec.wd3.myworkdayjobs.com/Samsung_Careers/job/1", "company_name": "Samsung"},
+                    {"url": "https://sec.wd3.myworkdayjobs.com/Samsung_Careers/job/2", "company_name": "Samsung Semi"},
+                    {"url": "https://www.google.com/about/careers/1", "company_name": "Google"}]
+        assert cs.harvest_boards(listings) == {"lever": ["zoox"], "workday": ["sec|wd3|Samsung_Careers|Samsung"]}
+
+    def test_rotation_skips_configured_and_covers_every_board_once(self):
+        harvested = {"greenhouse": [f"b{i}" for i in range(40)] + ["stripe"],
+                     "workday": ["nvidia|wd5|NVIDIAExternalCareerSite|NVIDIA corp"]}
+        cfg = {"greenhouse": ["Stripe"], "workday": ["nvidia|wd5|NVIDIAExternalCareerSite|NVIDIA"], "max_age_hours": 72}
+        runs = [cs.rotation_slice(cfg, harvested, 4, now=1800 * k) for k in range(4)]
+        picked = [b for r in runs for b in r.get("greenhouse", [])]
+        assert sorted(picked) == sorted(f"b{i}" for i in range(40))   # each harvested board exactly once per cycle
+        assert not any(r.get("workday") for r in runs)                  # configured (by tenant/site) is never repeated
+        assert all(r.get("greenhouse") for r in runs)                   # the work is spread across runs
+
+    def test_fetch_all_adds_harvested_boards(self, monkeypatch):
+        listings = [{"url": "https://jobs.ashbyhq.com/tinyco/1", "company_name": "TinyCo", "active": False}]
+        monkeypatch.setattr(cs, "download_simplify", lambda url=cs.SIMPLIFY_URL: listings)
+        seen = []
+        now = datetime.now(timezone.utc)
+
+        def ashby(board):
+            seen.append(board)
+            return [cs._job("Software Engineer Intern", "TinyCo", "NYC", "https://t/1", "x", now, "ashby", board)]
+        monkeypatch.setattr(cs, "fetch_ashby", ashby)
+        cfg = {"harvest_simplify_boards": True, "harvest_groups": 1}
+        out = cs.fetch_all(cfg, ["software"], ["intern"], [])
+        assert seen == ["tinyco"] and [j["job_url"] for j in out] == ["https://t/1"]
+        assert cs.fetch_all({"harvest_simplify_boards": False}, ["software"], ["intern"], []) == [] and seen == ["tinyco"]
+
+    def test_fetch_oracle(self, monkeypatch):
+        def get(url, params=None, **kw):
+            if url.endswith("/recruitingCEJobRequisitions"):
+                assert "siteNumber=CX_1" in params["finder"]
+                return _Resp({"items": [{"requisitionList": [
+                    {"Id": "9", "Title": "Software Engineering Intern", "PostedDate": _ago(2)[:10], "PrimaryLocation": "Austin, TX, United States"},
+                    {"Id": "8", "Title": "Production Specialist", "PostedDate": _ago(2)[:10]}]}]})
+            assert 'Id="9"' in params["finder"]
+            return _Resp({"items": [{"ExternalDescriptionStr": "<p>Build</p>", "ExternalQualificationsStr": "<p>CS</p>"}]})
+        monkeypatch.setattr(cs.requests, "get", get)
+        jobs = cs.fetch_oracle("Emerson|h.oraclecloud.com|CX_1")
+        assert [(j["title"], j["company"], j["description"]) for j in jobs] == [("Software Engineering Intern", "Emerson", "Build\n\nCS")]
+        assert jobs[0]["job_url"] == "https://h.oraclecloud.com/hcmUI/CandidateExperience/en/sites/CX_1/job/9"
+
+    def test_fetch_workable(self, monkeypatch):
+        monkeypatch.setattr(cs.requests, "get", lambda *a, **k: _Resp({"name": "Eluvio", "jobs": [
+            {"title": "Software Intern", "city": "Berkeley", "state": "California", "country": "United States",
+             "telecommuting": "True", "url": "https://apply.workable.com/j/1", "description": "<p>Video</p>",
+             "published_on": "2026-10-30"}]}))
+        j = cs.fetch_workable("eluvio")[0]
+        assert (j["company"], j["location"], j["description"]) == ("Eluvio", "Berkeley, California, United States (Remote)", "Video")
+
+    def test_fetch_rippling_reads_dates_from_details(self, monkeypatch):
+        def get(url, params=None, **kw):
+            if url.endswith("/jobs"):
+                return _Resp({"totalPages": 1, "items": [
+                    {"id": "a", "name": "Robotics Software Intern", "url": "https://ats.rippling.com/fr/jobs/a",
+                     "locations": [{"name": "San Francisco, CA"}]},
+                    {"id": "b", "name": "Robotics Software Intern", "url": "https://ats.rippling.com/fr/jobs/b"},
+                    {"id": "c", "name": "Director, Clinical"}]})
+            if url.endswith("/a"):
+                return _Resp({"createdOn": _ago(3), "companyName": "Foundation", "description": {"company": "<p>Us</p>", "role": "<p>Robots</p>"}})
+            if url.endswith("/b"):
+                return _Resp({"createdOn": _ago(900), "description": "old"})
+            raise AssertionError("non-internships aren't opened")
+        monkeypatch.setattr(cs.requests, "get", get)
+        jobs = cs.fetch_rippling("fr")
+        assert [(j["job_url"], j["company"], j["description"]) for j in jobs] == [
+            ("https://ats.rippling.com/fr/jobs/a", "Foundation", "Us\n\nRobots")]

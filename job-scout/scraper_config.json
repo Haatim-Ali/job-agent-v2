@@ -242,7 +242,9 @@
       "Qualcomm|careers.qualcomm.com|qualcomm.com",
       "Boston Scientific|bostonscientific.eightfold.ai|bostonscientific.com"
     ],
-    "simplify": true
+    "simplify": true,
+    "harvest_simplify_boards": true,
+    "harvest_groups": 4
   },
   "role_keywords": [
     "software",

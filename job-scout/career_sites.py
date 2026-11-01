@@ -313,6 +313,149 @@ def fetch_successfactors(spec):
     return jobs
 
 
+def fetch_oracle(spec, max_age_hours=72):
+    """Oracle Recruiting Cloud career sites (JPMorgan, TI, Emerson, Dell, Honeywell...): a public REST
+    API behind every .../hcmUI/CandidateExperience/en/sites/<site>/job/<id> page.
+    spec: "Company|<host>|<site number>", e.g. "Emerson|hdjq.fa.us2.oraclecloud.com|CX_1"."""
+    company, host, site = spec.split("|")
+    api = f"https://{host}/hcmRestApi/resources/latest"
+    resp = requests.get(f"{api}/recruitingCEJobRequisitions", headers=HEADERS, timeout=TIMEOUT, params={
+        "onlyData": "true", "expand": "requisitionList",
+        "finder": f"findReqs;siteNumber={site},keyword=intern,limit=50,sortBy=POSTING_DATES_DESC"})
+    resp.raise_for_status()
+    items = resp.json().get("items") or [{}]
+    jobs, cutoff = [], datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    for r in items[0].get("requisitionList") or []:
+        posted = _parse_dt(r.get("PostedDate"))
+        if posted is None or posted < cutoff or not _MAYBE_INTERN.search(r.get("Title", "")):
+            continue
+        desc = ""
+        try:
+            d = requests.get(f"{api}/recruitingCEJobRequisitionDetails", headers=HEADERS, timeout=TIMEOUT, params={
+                "onlyData": "true", "expand": "all", "finder": f'ById;Id="{r["Id"]}",siteNumber={site}'}).json()
+            info = (d.get("items") or [{}])[0]
+            desc = "\n\n".join(_html_to_text(info.get(k)) for k in
+                                ("ExternalDescriptionStr", "ExternalResponsibilitiesStr", "ExternalQualificationsStr")
+                                if info.get(k))
+        except (requests.RequestException, ValueError, KeyError):
+            pass
+        jobs.append(_job(r.get("Title", ""), company, r.get("PrimaryLocation", ""),
+                         f"https://{host}/hcmUI/CandidateExperience/en/sites/{site}/job/{r.get('Id')}",
+                         desc, posted, "oracle", spec))
+    return jobs
+
+
+def fetch_workable(account):
+    """Workable's public job widget, with descriptions. account: apply.workable.com/<account>/."""
+    resp = requests.get(f"https://apply.workable.com/api/v1/widget/accounts/{account}",
+                        params={"details": "true"}, headers=HEADERS, timeout=TIMEOUT)
+    resp.raise_for_status()
+    data = resp.json()
+    jobs = []
+    for j in data.get("jobs") or []:
+        location = ", ".join(filter(None, [j.get("city"), j.get("state"), j.get("country")]))
+        if str(j.get("telecommuting")).lower() == "true":
+            location = f"{location} (Remote)".strip()
+        jobs.append(_job(j.get("title", ""), data.get("name") or account, location, j.get("url", ""),
+                         _html_to_text(j.get("description")),
+                         _parse_dt(j.get("published_on") or j.get("created_at")), "workable", account))
+    return jobs
+
+
+def fetch_rippling(board, max_age_hours=72):
+    """Rippling ATS boards (ats.rippling.com/<board>/jobs/...). The list has no dates, so each
+    internship-looking posting is read for its date and description."""
+    base = f"https://ats.rippling.com/api/v2/board/{board}/jobs"
+    jobs, cutoff = [], datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    for page in range(5):
+        resp = requests.get(base, params={"page": page, "pageSize": 100}, headers=HEADERS, timeout=TIMEOUT)
+        resp.raise_for_status()
+        data = resp.json()
+        for j in data.get("items") or []:
+            if not _MAYBE_INTERN.search(j.get("name", "")):
+                continue
+            try:
+                info = requests.get(f"{base}/{j['id']}", headers=HEADERS, timeout=TIMEOUT).json()
+            except (requests.RequestException, ValueError, KeyError):
+                continue
+            posted = _parse_dt(info.get("createdOn"))
+            if posted is None or posted < cutoff:
+                continue
+            desc = info.get("description")
+            if isinstance(desc, dict):   # {"company": html, "role": html}
+                desc = "\n\n".join(_html_to_text(v) for v in desc.values() if isinstance(v, str))
+            else:
+                desc = _html_to_text(desc)
+            location = "; ".join(l.get("name", "") for l in j.get("locations") or [])
+            jobs.append(_job(j.get("name", ""), info.get("companyName") or board.title(), location,
+                             j.get("url", ""), desc, posted, "rippling", board))
+        if page + 1 >= (data.get("totalPages") or 1):
+            break
+    return jobs
+
+
+def board_from_listing(url, company):
+    """(ats, spec) for any posting link a fetcher here can read, else None. Like _ats_from_url, plus
+    the sources that need a company name or aren't used for application packets."""
+    site, board = _ats_from_url(url)
+    if site != "other":
+        return site, (f"{board}|{company}" if site == "workday" and company else board)
+    m = re.search(r"https://(wd\d+)\.myworkdaysite\.com/(?:[a-z]{2}-[A-Z]{2}/)?recruiting/([\w-]+)/([\w-]+)", url)
+    if m:   # the same Workday site under another host
+        wd, tenant, site_name = m.groups()
+        return "workday", f"{tenant}|{wd}|{site_name}" + (f"|{company}" if company else "")
+    m = re.search(r"https://([\w.-]+\.oraclecloud\.com)/hcmUI/CandidateExperience/[a-z]{2}/sites/([\w-]+)/", url)
+    if m and company:
+        return "oracle", f"{company}|{m.group(1)}|{m.group(2)}"
+    m = re.search(r"apply\.workable\.com/(?!j/)([\w-]+)/", url)
+    if m:
+        return "workable", m.group(1)
+    m = re.search(r"ats\.rippling\.com/([\w-]+)/jobs/", url)
+    if m:
+        return "rippling", m.group(1)
+    return None
+
+
+def _board_key(ats, spec):
+    """Identity of a board regardless of the optional company name: ("workday", "sec|wd3|samsung_careers")."""
+    parts = spec.lower().split("|")
+    if ats == "workday":
+        parts = parts[:3]
+    elif ats == "oracle":
+        parts = parts[1:]
+    return ats, "|".join(parts)
+
+
+def harvest_boards(listings):
+    """Every company board behind the Simplify list, open listings or not: {ats: [spec, ...]}.
+    A company that posted one internship there this season is worth watching for the next."""
+    out, seen = {}, set()
+    for j in listings:
+        found = board_from_listing(j.get("url", ""), (j.get("company_name") or "").replace("|", " ").strip())
+        if not found or _board_key(*found) in seen:
+            continue
+        seen.add(_board_key(*found))
+        out.setdefault(found[0], []).append(found[1])
+    return out
+
+
+def rotation_slice(cfg_lists, harvested, groups, now=None):
+    """The harvested boards for this run: those not configured already, split into `groups` stable
+    groups by a hash of the board, one group per 30-minute run, so each is checked every
+    groups x 30 minutes while the configured boards are checked every run."""
+    import zlib
+    configured = {_board_key(ats, spec) for ats, specs in cfg_lists.items() if isinstance(specs, list)
+                  for spec in specs}
+    turn = int((now if now is not None else datetime.now(timezone.utc).timestamp()) // 1800) % max(groups, 1)
+    out = {}
+    for ats, specs in harvested.items():
+        for spec in specs:
+            key = _board_key(ats, spec)
+            if key not in configured and zlib.crc32("|".join(key).encode()) % max(groups, 1) == turn:
+                out.setdefault(ats, []).append(spec)
+    return out
+
+
 SIMPLIFY_URL = "https://raw.githubusercontent.com/SimplifyJobs/Summer2027-Internships/dev/.github/scripts/listings.json"
 GRAD_ONLY = {"Master's", "PhD", "MBA"}
 
@@ -342,10 +485,18 @@ def fetch_simplify(url=SIMPLIFY_URL):
     scrape of company career pages. Only open, visible listings that accept undergraduates.
     The list has no descriptions; Claude scores on title, company, location and the
     listing's metadata, and packets read the full description from the ATS later."""
+    return simplify_jobs(download_simplify(url))
+
+
+def download_simplify(url=SIMPLIFY_URL):
     resp = requests.get(url, headers=HEADERS, timeout=60)
     resp.raise_for_status()
+    return resp.json()
+
+
+def simplify_jobs(listings):
     jobs = []
-    for j in resp.json():
+    for j in listings:
         if not j.get("active") or not j.get("is_visible", True):
             continue
         degrees = set(j.get("degrees") or [])
@@ -410,6 +561,17 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=(), als
     now = datetime.now(timezone.utc)
 
     aged = {"max_age_hours": cfg.get("max_age_hours", 72)}   # these filter by age before fetching descriptions
+    simplify = []
+    if cfg.get("simplify", True):
+        try:
+            listings = download_simplify()
+            simplify = simplify_jobs(listings)
+            if cfg.get("harvest_simplify_boards"):
+                extra = rotation_slice(cfg, harvest_boards(listings), cfg.get("harvest_groups", 4))
+                cfg = {**cfg, **{ats: list(cfg.get(ats, [])) + specs for ats, specs in extra.items()}}
+                logging.info(f"Harvested boards this run: { {k: len(v) for k, v in extra.items()} }")
+        except Exception as e:
+            logging.warning(f"Simplify list failed: {e}")
     sources = (
         [(fetch_greenhouse, b, aged) for b in cfg.get("greenhouse", [])]
         + [(fetch_lever, c, {}) for c in cfg.get("lever", [])]
@@ -418,8 +580,11 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=(), als
         + [(fetch_workday, w, aged) for w in _unique_workday(cfg.get("workday", []))]
         + [(fetch_successfactors, s, {}) for s in cfg.get("successfactors", [])]
         + [(fetch_eightfold, e, aged) for e in cfg.get("eightfold", [])]
+        + [(fetch_oracle, o, aged) for o in cfg.get("oracle", [])]
+        + [(fetch_workable, w, {}) for w in cfg.get("workable", [])]
+        + [(fetch_rippling, r, aged) for r in cfg.get("rippling", [])]
         + [(fetch_amazon, q, {}) for q in cfg.get("amazon_queries", [])]
-        + ([(lambda _: fetch_simplify(), "simplify", {})] if cfg.get("simplify", True) else [])
+        + [(lambda _: simplify, "simplify", {})]
     )
 
     def run(source):
@@ -430,8 +595,8 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=(), als
             logging.warning(f"Career site {getattr(fetch, '__name__', 'source')}({arg}) failed: {e}")
             return None
 
-    # ~200 boards: fetched in parallel (each is a different host or board), results kept in config order
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    # hundreds of boards: fetched in parallel (each is a different host or board), results kept in config order
+    with ThreadPoolExecutor(max_workers=12) as pool:
         fetched = list(pool.map(run, sources))
 
     results, seen_urls = [], set()
