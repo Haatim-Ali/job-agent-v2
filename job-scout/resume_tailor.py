@@ -32,6 +32,42 @@ SECTION_LABELS = {
     "JOBAGENT_BULLETS": "Project: JobAgent, Autonomous Internship Search & Resume Tailoring Pipeline",
 }
 
+# Two resume layouts; tailor.choose_template picks one per job.
+#   results: ResumeTemplate.tex, result-first bullets ("Cut X by Y by doing Z"), bullet_bank.yaml alternates
+#   classic: ResumeTemplateClassic.tex, Haatim's earlier resume: story-order bullets with bold tools and
+#            numbers, Campus Involvements and Interests. Bullets keep their order (some start "Then ..." or
+#            "Turned those one-off runs ..."), and the bank's alternates aren't mixed in (different style).
+TEMPLATES = {
+    "results": {"file": "ResumeTemplate.tex", "alternates": True, "fixed_order": False, "skill_line_max": 108,
+                "summary": "result-first bullets that lead with the outcome and its number, a grouped "
+                           "Technical Skills section, JobAgent listed first; dense and metric-led for quick scanning"},
+    "classic": {"file": "ResumeTemplateClassic.tex", "alternates": False, "fixed_order": True,
+                "skill_line_max": 220,   # its Additional lines may wrap to a second line, as in the original
+                "summary": "narrative bullets in the order the work happened, with tools and numbers in bold, "
+                           "Campus Involvements and Interests (weightlifting, jiu-jitsu...), Uplink listed first; "
+                           "reads like a story of what was built and shows personality"},
+}
+DEFAULT_TEMPLATE = "results"
+
+
+def template_path(name):
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), TEMPLATES[name]["file"])
+
+
+def keep_bullet_order(edits):
+    """Put each section's picked bullets back in template order (for the classic layout, whose
+    bullets read as a sequence). Rewording is untouched."""
+    if not isinstance(edits, dict):
+        return edits
+    def index(p):
+        try:
+            return int(str(p.get("id", "")).rsplit("-", 1)[1])
+        except (ValueError, IndexError):
+            return 10 ** 6
+    return {m: sorted([p for p in v if isinstance(p, dict)], key=index) if isinstance(v, list) else v
+            for m, v in edits.items()}
+
+
 MAX_GROWTH = 1.05      # a reworded bullet may be at most 5% longer than the original...
 GROWTH_SLACK = 6       # ...plus a few characters
 MIN_SHRINK = 0.70      # and must keep at least 70% of the original length
@@ -74,7 +110,8 @@ def extract_sections(tex):
     return out
 
 
-_UNESCAPE = [("\\textbf{", "**"), ("\\&", "&"), ("\\%", "%"), ("\\$", "$"), ("\\#", "#"),
+# a bare ~ is a non-breaking space ("C++~Programming"); it goes before \textasciitilde{} (a real "~") is decoded
+_UNESCAPE = [("\\textbf{", "**"), ("~", " "), ("\\&", "&"), ("\\%", "%"), ("\\$", "$"), ("\\#", "#"),
              ("\\_", "_"), ("---", "\u2014"), ("--", "\u2013"), ("\\(\\rightarrow\\)", "\u2192"),
              ("\\textasciitilde{}", "~")]
 
@@ -224,8 +261,9 @@ def revert_alternate(result, sources, sections, slots, changes):
 BANK_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bullet_bank.yaml")
 
 
-def load_bank(sections, path=BANK_PATH):
-    """(bank, slots, skill_extras): template defaults followed by the approved alternates."""
+def load_bank(sections, path=BANK_PATH, alternates=True):
+    """(bank, slots, skill_extras): template defaults followed by the approved alternates
+    (none with alternates=False; the skill extras are always read)."""
     try:
         with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
@@ -234,7 +272,7 @@ def load_bank(sections, path=BANK_PATH):
     bank, slots = {}, {}
     for marker, defaults in sections.items():
         extra = [marked_to_latex(t) for t in data.get(marker) or [] if isinstance(t, str)]
-        extra = [e for e in extra if e not in defaults]
+        extra = [e for e in extra if e not in defaults] if alternates else []
         bank[marker], slots[marker] = list(defaults) + extra, len(defaults)
     return bank, slots, [x for x in data.get("skill_extras") or [] if isinstance(x, str)]
 
@@ -310,7 +348,7 @@ def skill_inventory(template_skills, kb_skills, extras):
     return inv
 
 
-def validate_skills(lines, inventory, template_skills):
+def validate_skills(lines, inventory, template_skills, line_max=SKILL_LINE_MAX):
     """None if the proposed skills block is acceptable, else the reason."""
     if not isinstance(lines, list) or not 3 <= len(lines) <= 4:
         return "need 3 or 4 skill lines"
@@ -329,14 +367,14 @@ def validate_skills(lines, inventory, template_skills):
                 return f"duplicate skill {it!r}"
             seen.add(key)
         total += len(items)
-        if len(label) + 2 + len(", ".join(items)) > SKILL_LINE_MAX:
+        if len(label) + 2 + len(", ".join(items)) > line_max:
             return f"line too long: {label}"
     if total < sum(len(l["items"]) for l in template_skills) - 4:
         return "dropped too many skills"
     return None
 
 
-def fit_skills(lines):
+def fit_skills(lines, line_max=SKILL_LINE_MAX):
     """Trim the last (least relevant) items off any skill line too long to print on one line.
     Returns (lines, dropped_items). Leaves anything malformed for validate_skills to reject."""
     if not isinstance(lines, list):
@@ -347,7 +385,7 @@ def fit_skills(lines):
             out.append(line)
             continue
         items = [i for i in line["items"]]
-        while len(items) > 1 and len(line["label"]) + 2 + len(", ".join(map(str, items))) > SKILL_LINE_MAX:
+        while len(items) > 1 and len(line["label"]) + 2 + len(", ".join(map(str, items))) > line_max:
             dropped.append(items.pop())
         out.append({"label": line["label"], "items": items})
     return out, dropped
@@ -468,8 +506,31 @@ def build_retry_note(changed, sections, slots=None):
             "wherever it truthfully fits, or swap in a more relevant alternate). The same hard rules apply.")
 
 
+STYLE_RULES = {
+    "results": ("""1. Pick which bullets to show: exactly as many as the section's default bullets, chosen from its
+   defaults and its approved alternates (every one is true). Prefer whichever bullets best match
+   this job's must-haves, and put the most relevant first.""",
+                """- Match the existing style: past-tense action verb first, no period at the end. Bullets are
+  result-first (outcome, then "by ..." how): keep that shape, but you may reword both the
+  outcome and the "by ..." part in the job's terms, or lead with a different true outcome.""",
+                """Think about which of the candidate's real strengths this job values most, and make sure those
+bullets come first in their section and read in the job's language."""),
+    "classic": ("""1. Keep every section's bullets, in their given order: they read as a short story of the work
+   (later bullets say "Then ...", "Kept it live ...", "Turned those one-off runs ..."), so list each
+   section's ids in the order given.""",
+                """- Match the existing style: each bullet keeps its place in the story, so a bullet that opens by
+  linking to the one before ("Then ...", "Kept it live ...", "Turned those one-off runs ...", "Moved
+  from classification to control ...") keeps that link; everything after it may be reworded freely in
+  the job's terms. No period at the end. Tools and numbers in **bold** stay bold.""",
+                """Think about which of the candidate's real strengths this job values most, and make sure those
+bullets read in the job's language."""),
+}
+
+
 def build_prompt(sections, analysis, custom_prompt="", job_description="", slots=None,
-                 projects=None, coursework=None, skills=None, inventory=None):
+                 projects=None, coursework=None, skills=None, inventory=None, style="results",
+                 skill_line_max=SKILL_LINE_MAX):
+    pick_rule, style_rule, closing = STYLE_RULES.get(style, STYLE_RULES["results"])
     slots = slots or {}
     blocks = []
     for marker, bullets in sections.items():
@@ -493,7 +554,7 @@ def build_prompt(sections, analysis, custom_prompt="", job_description="", slots
                   "Regroup and reorder them for this job: put the job's must-have skills first, and you may rename the\n"
                   "labels (e.g. \"AI & Agents\", \"Systems & Tools\", \"Data & DevOps\"; at most 26 characters). Use ONLY skills\n"
                   f"from this list, spelled exactly as written, each at most once: {json.dumps(sorted(inventory.values()))}\n"
-                  f"Keep nearly all current skills. Each line must fit on one printed line ({SKILL_LINE_MAX} characters including the label);\n"
+                  f"Keep nearly all current skills. Each line must fit in {skill_line_max} characters including the label;\n"
                   "put the most job-relevant items first in each line, since overflow is cut from the end. Every item must\n"
                   "genuinely belong under its line's label (web frameworks are not \"AI\", databases are not \"Languages\").\n")
     return f"""You are tailoring a strong one-page resume so it reads as written for this specific job:
@@ -504,9 +565,7 @@ ATS keywords: {json.dumps(analysis.get("ats_keywords", []))}
 {jd}{custom}
 The resume's layout must stay identical (same sections, same number of bullets per section, similar
 bullet lengths), but its CONTENT and WORDING must shift toward this job. Per section you may:
-1. Pick which bullets to show: exactly as many as the section's default bullets, chosen from its
-   defaults and its approved alternates (every one is true). Prefer whichever bullets best match
-   this job's must-haves, and put the most relevant first.
+{pick_rule}
 2. Reword picked bullets to use the job's terminology wherever it TRUTHFULLY describes what the
    bullet already says, so a recruiter or ATS scanning for this job's keywords finds them.
    In total, change {lo} to {hi} of the {total} shown bullets (reworded or swapped-in alternates;
@@ -517,8 +576,7 @@ bullet lengths), but its CONTENT and WORDING must shift toward this job. Per sec
    the bullet doesn't already say.
 3. Keep bold as it is: a bullet with no **bold** must stay without bold.
 
-Think about which of the candidate's real strengths this job values most, and make sure those
-bullets come first in their section and read in the job's language.
+{closing}
 
 Hard rules (edits that break these are automatically discarded):
 - Keep every number in a bullet. Never add a tool, metric, outcome or responsibility that isn't
@@ -528,9 +586,7 @@ Hard rules (edits that break these are automatically discarded):
   by dropping a minor detail this job cares less about (never a number).
 - Use only the given ids, each at most once per section; no new bullets, no merging.
 - No em dashes unless the original bullet already has one. Keep **bold** markers balanced.
-- Match the existing style: past-tense action verb first, no period at the end. Bullets are
-  result-first (outcome, then "by ..." how): keep that shape, but you may reword both the
-  outcome and the "by ..." part in the job's terms, or lead with a different true outcome.
+{style_rule}
 {extra}
 Bullets (text uses **bold** markers):
 {{

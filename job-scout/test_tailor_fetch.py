@@ -70,3 +70,40 @@ def test_known_role_and_company_win():
     assert a == {"role_title": "SWE Intern", "company": "Samsung Semiconductor",
                  "company_slug": "samsung-semiconductor"}
     assert tailor.apply_known_job({"company": "Figma"})["company"] == "Figma"
+
+
+# ── Resume template choice (2026-11-03) ──────────────────────────────────────
+
+@pytest.mark.parametrize("prompt,name", [
+    ("use the classic template", "classic"), ("Classic resume please", "classic"),
+    ("results-first layout", "results"), ("use the results template", "results"),
+])
+def test_requested_template_wins_without_asking_claude(monkeypatch, prompt, name):
+    monkeypatch.setattr(tailor, "ask_json", lambda *a, **k: pytest.fail("Claude shouldn't be asked"))
+    assert tailor.choose_template(None, {}, prompt) == (name, "requested")
+
+
+def test_claude_picks_template(monkeypatch):
+    seen = {}
+
+    def ask(client, prompt, schema, **kw):
+        seen["prompt"] = prompt
+        return {"template": "classic", "reason": "Small game studio that values craft"}
+    monkeypatch.setattr(tailor, "ask_json", ask)
+    got = tailor.choose_template(None, {"role_title": "Gameplay Intern", "company": "Crystal Dynamics", "tone": "startup"},
+                                 "focus on C++", "Build gameplay systems")
+    assert got == ("classic", "Small game studio that values craft")
+    assert "Crystal Dynamics" in seen["prompt"] and "Build gameplay systems" in seen["prompt"]
+
+
+def test_template_choice_failure_uses_default(monkeypatch):
+    def boom(*a, **k):
+        raise RuntimeError("API down")
+    monkeypatch.setattr(tailor, "ask_json", boom)
+    assert tailor.choose_template(None, {}) == ("results", "default")
+
+
+def test_template_line():
+    assert tailor.template_line({"resume_template": "classic", "template_reason": "Startup"}) == "\n🗂 Classic template: Startup"
+    assert tailor.template_line({"resume_template": "results", "template_reason": "default"}) == "\n🗂 Results template"
+    assert tailor.template_line({}) == ""

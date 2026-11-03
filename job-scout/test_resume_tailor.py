@@ -325,6 +325,61 @@ def test_fit_skills_trims_the_tail_of_overlong_lines():
 def test_resume_and_cover_letter_use_school_email():
     # Haatim's application email is htali@ucsc.edu (2026-10-26)
     here = os.path.dirname(__file__)
-    for name in ("ResumeTemplate.tex", "CoverLetterTemplate.tex", "experience_kb.yaml"):
+    for name in ("ResumeTemplate.tex", "ResumeTemplateClassic.tex", "CoverLetterTemplate.tex", "experience_kb.yaml"):
         text = open(os.path.join(here, name), encoding="utf-8").read()
         assert "htali@ucsc.edu" in text and "haatimta@gmail.com" not in text, name
+
+
+# ── Classic template (2026-11-03) ─────────────────────────────────────────────
+
+CLASSIC = open(rt.template_path("classic"), encoding="utf-8").read()
+
+
+def test_classic_template_has_every_tailoring_block():
+    sections = rt.extract_sections(CLASSIC)
+    assert {m: len(b) for m, b in sections.items()} == {m: 3 for m in rt.SECTIONS}
+    assert [n for n, _ in rt.extract_projects(CLASSIC)] == ["Uplink", "Pathwise", "JobAgent"]
+    assert "C++ Programming" in rt.extract_coursework(CLASSIC)       # "C++~Programming" shown plainly
+    assert [l["label"] for l in rt.extract_skills(CLASSIC)] == ["Languages", "Frameworks & Tools", "AI/ML & Agents"]
+    assert "Interests:" in CLASSIC.split("%%SKILLS_END%%")[1]          # interests stay out of the skills block
+    assert "saraxjain" not in CLASSIC and "DisableLigatures" in CLASSIC
+
+
+def test_classic_coursework_reorder_keeps_the_latex():
+    names = rt.extract_coursework(CLASSIC)
+    tex = rt.render_coursework(CLASSIC, list(reversed(names)))
+    assert "Computer Systems \\& Assembly Language, Computer Programming in~C, C++~Programming" in tex
+
+
+def test_tilde_unescape_keeps_real_tildes():
+    assert rt.latex_to_marked(r"C++~Programming, \textasciitilde{}5") == "C++ Programming, ~5"
+
+
+def test_keep_bullet_order_restores_template_order_with_rewording():
+    edits = {"A": [{"id": "A-2", "text": "Then c"}, {"id": "A-0", "text": "a!"}, {"id": "A-1", "text": "b"}],
+             "B": "junk"}
+    assert rt.keep_bullet_order(edits) == {
+        "A": [{"id": "A-0", "text": "a!"}, {"id": "A-1", "text": "b"}, {"id": "A-2", "text": "Then c"}], "B": "junk"}
+
+
+def test_classic_uses_no_bank_alternates_but_keeps_skill_extras():
+    sections = rt.extract_sections(CLASSIC)
+    bank, slots, extras = rt.load_bank(sections, alternates=False)
+    assert bank == sections and extras == EXTRAS
+
+
+def test_prompt_style_per_template():
+    sections = rt.extract_sections(CLASSIC)
+    classic = rt.build_prompt(sections, {"role_title": "R", "company": "C"}, style="classic")
+    assert "in their given order" in classic and "result-first" not in classic
+    results = rt.build_prompt(SECTIONS, {"role_title": "R", "company": "C"})
+    assert "result-first" in results and "put the most relevant first" in results
+
+
+def test_classic_skill_lines_may_wrap_to_two_lines():
+    skills = rt.extract_skills(CLASSIC)
+    inv = rt.skill_inventory(skills, [], [])
+    long_line = [{"label": l["label"], "items": l["items"]} for l in skills]
+    assert rt.validate_skills(long_line, inv, skills) is not None                  # too long for the one-line layout
+    assert rt.validate_skills(long_line, inv, skills, rt.TEMPLATES["classic"]["skill_line_max"]) is None
+    assert rt.fit_skills(long_line, rt.TEMPLATES["classic"]["skill_line_max"])[1] == []

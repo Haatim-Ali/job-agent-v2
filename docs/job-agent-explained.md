@@ -545,6 +545,21 @@ Pending state lives in two Python dictionaries in memory, `pending_requests` and
 - **Markers.** The tailorable bullets sit between comment lines like `% %%AIEA_BULLETS_START%%` and `% %%AIEA_BULLETS_END%%`. Because they start with `%`, LaTeX ignores them, but Python can find them with a regex and swap the bullets in between.
 - **pdflatex** is the compiler. `compile_pdf` writes the `.tex` file into a **temporary directory**, runs `pdflatex -interaction=nonstopmode` (don't stop to ask questions on an error) with a 30-second timeout, and copies the PDF out.
 
+### Two templates (since 2026-11-03)
+
+There are two baseline resumes, listed in `resume_tailor.TEMPLATES`, with the same facts in different styles:
+
+| Template | File | Style | Tailoring |
+|---|---|---|---|
+| `results` | `ResumeTemplate.tex` (v7) | centered header, result-first bullets ("Cut X by Y by doing Z"), Technical Skills, JobAgent first | bullets may be picked from `bullet_bank.yaml` alternates and reordered; skill lines fit on one line (108 characters) |
+| `classic` | `ResumeTemplateClassic.tex` | name left, contact right; story-order bullets with bold tools and numbers; Campus Involvements; an Additional section with Interests; Uplink first | the same 15 bullets in their order (later ones say "Then ..." or "Turned those one-off runs ..."), reworded only; no bank alternates (they're in the other style); skill lines may wrap to two lines (220 characters); Interests are never touched |
+
+`classic` is Haatim's earlier resume (`~/Downloads/Haatim_Ali_Resume.tex`, Oct 22), which had some success. Copying it in changed three things: the shared preamble (the font fallback for the VPS and the ATS ligature fix), `htali@ucsc.edu` instead of the Gmail address, and the Uplink link to `github.com/Haatim-Ali/uplink` instead of the teammate's repository. Its JobAgent bullet still says 195 tests, as written.
+
+**Choosing.** `tailor.choose_template` runs before the resume edits. If the request names one ("use the classic template", "results-first layout"), that wins. Otherwise one Sonnet call (low effort) reads both styles' descriptions, the role, company, tone, must-haves and the first 2,000 characters of the posting, and picks one with a one-sentence reason. The rough rule it's given: `classic` for startups, small and mid-size companies, game studios, research labs and mission-driven teams, where the person and the story of what they built stand out; `results` for large companies and high-volume screening (big tech, finance, enterprise, defense, hardware). The posting's own words beat company size. If the call fails, `results` is used. The choice is logged, recorded as the first entry in the resume's change list, and shown in Discord under the tailored files (`🗂 Classic template: <reason>`). It's a judgment call, not learned from outcomes; comparing which template got interviews in the tracker would show whether the rule holds.
+
+A test run on Crystal Dynamics' Gameplay Engineer intern posting picked `classic` ("a game studio ... the narrative of what was built plus personality should resonate"); Claude proposed 4 rewordings, the length check and fact-check rejected 3 (one added "source control on GitHub"), and the skills were regrouped with C++ first. One page.
+
 ### The pipeline, one call at a time
 
 `tailor.tailor(job_url, job_description)` runs these steps. Every Claude call here uses the **draft model**, `DRAFT_MODEL` in `claude_json.py`: **Claude Sonnet 5.5** (`claude-sonnet-5-5`) since 2026-10-01, previously Sonnet 4.6 (see "Choosing the draft model" in Part 8). Passes 2 and 3 get your knowledge base as a cached system block.
@@ -1063,6 +1078,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-11-03: second resume template.** `ResumeTemplateClassic.tex` (Haatim's earlier story-style resume) joins `ResumeTemplate.tex`; `tailor.choose_template` picks one per job (or the request names it) and Discord shows which. Classic bullets keep their order (`keep_bullet_order`) and use no bank alternates; skill lines may wrap to two lines there (`skill_line_max` per template). A bare `~` in LaTeX now reads as a space for Claude. 12 tests added.
 
 **2026-11-03: 👍 tailoring always knows the company.** Two 👍 runs named their files (and cover letters) "unknown" and "not-specified" because the scraped text had no company: a LinkedIn description body and one Greenhouse section. The bot now passes the alert card's role and company to `tailor.py` (`--role`, `--company`), which puts them at the top of the description and uses them over Claude's reading (`with_known_job`, `apply_known_job`), and `fetch_job_description` keeps the page title with the section it picks. 7 tests added.
 

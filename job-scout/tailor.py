@@ -44,7 +44,6 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
 BOT_TOKEN         = os.getenv("DISCORD_BOT_TOKEN")
 SCRIPT_DIR        = os.path.dirname(os.path.abspath(__file__))
 KB_PATH           = os.path.join(SCRIPT_DIR, "experience_kb.yaml")
-RESUME_TEMPLATE   = os.path.join(SCRIPT_DIR, "ResumeTemplate.tex")
 COVER_TEMPLATE    = os.path.join(SCRIPT_DIR, "CoverLetterTemplate.tex")
 OUTPUT_DIR        = os.getenv("OUTPUT_DIR", os.path.join(SCRIPT_DIR, "output"))
 RESUME_SYNC_PATH  = os.getenv("RESUME_SYNC_PATH", "")   # optional local sync folder, set in .env
@@ -177,19 +176,59 @@ def kb_skill_list():
     return [x for k, v in groups.items() if k != "soft" and isinstance(v, list) for x in v if isinstance(x, str)]
 
 
-def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_description=""):
+TEMPLATE_SCHEMA = obj({"template": {"type": "string", "enum": list(resume_tailor.TEMPLATES)}, "reason": STR})
+
+
+def choose_template(client, analysis, custom_prompt="", job_description=""):
+    """(template name, reason): which resume layout to tailor for this job. The candidate can force
+    one in the request ("use the classic template"); otherwise Claude picks from the posting."""
+    asked = re.search(r"\b(classic|results?)(?:[- ]first)?\b[^.\n]{0,20}\b(?:template|layout|resume|version)\b",
+                      custom_prompt or "", re.I)
+    if asked:
+        name = "classic" if asked.group(1).lower() == "classic" else "results"
+        return name, "requested"
+    options = "\n".join(f"- {n}: {t['summary']}" for n, t in resume_tailor.TEMPLATES.items())
+    try:
+        got = ask_json(client, f"""Two versions of the same candidate's one-page resume hold the same facts in different styles:
+{options}
+
+Pick the one this employer's reviewers are more likely to respond to. Roughly: "classic" suits startups,
+small and mid-size companies, game studios, research labs and mission-driven teams, where who the person is
+and the story of what they built stand out; "results" suits large companies and high-volume screening
+(big tech, finance, enterprise, defense, hardware), where reviewers and ATS scan for metrics and keywords.
+Use the posting itself over the company's size when it says what it values.
+
+Role: {analysis.get("role_title")} at {analysis.get("company")} (tone: {analysis.get("tone")})
+Must have: {json.dumps(analysis.get("must_have", []))}
+Job description (excerpt): {(job_description or "")[:2000]}
+
+Return the template name and a one-sentence reason.""", TEMPLATE_SCHEMA, max_tokens=2000,
+                       effort="low", label="template")
+        return got["template"], got.get("reason", "")
+    except Exception as e:
+        logging.warning(f"Template choice failed, using {resume_tailor.DEFAULT_TEMPLATE}: {e}")
+        return resume_tailor.DEFAULT_TEMPLATE, "default"
+
+
+def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_description="", template_name=None):
     """
-    Tailor the baseline resume (ResumeTemplate.tex) for one job, keeping its exact layout.
+    Tailor one of the baseline resumes (resume_tailor.TEMPLATES, picked by choose_template) for one
+    job, keeping its exact layout.
     Claude picks each section's bullets from the defaults plus the approved alternates in
     bullet_bank.yaml, rewords them toward the job, and reorders projects, coursework and skills.
     Everything is validated in code and every changed bullet is fact-checked.
     Layout guard: the result must stay on one page and use no more text lines than the
     untouched baseline; otherwise rewordings, then alternates, then the skills are reverted.
     """
-    with open(RESUME_TEMPLATE, "r", encoding="utf-8") as f:
+    why = "given"
+    if template_name not in resume_tailor.TEMPLATES:
+        template_name, why = choose_template(client, analysis, custom_prompt, job_description)
+    spec = resume_tailor.TEMPLATES[template_name]
+    logging.info(f"Resume template: {template_name} ({why})")
+    with open(resume_tailor.template_path(template_name), "r", encoding="utf-8") as f:
         template = f.read()
     defaults = resume_tailor.extract_sections(template)
-    bank, slots, skill_extras = resume_tailor.load_bank(defaults)
+    bank, slots, skill_extras = resume_tailor.load_bank(defaults, alternates=spec["alternates"])
     projects = [n for n, _ in resume_tailor.extract_projects(template)]
     coursework = resume_tailor.extract_coursework(template)
     base_skills = resume_tailor.extract_skills(template)
@@ -210,7 +249,8 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
     })
     edit_prompt = resume_tailor.build_prompt(bank, analysis, custom_prompt, job_description, slots=slots,
                                              projects=projects, coursework=coursework,
-                                             skills=base_skills, inventory=inventory)
+                                             skills=base_skills, inventory=inventory, style=template_name,
+                                             skill_line_max=spec["skill_line_max"])
     min_changed = resume_tailor.rewrite_target(sum(slots.values()))[0]
     reply = {}
     try:
@@ -230,6 +270,8 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
     except Exception as e:
         logging.warning(f"Resume edit pass failed, using baseline resume: {e}")
     edits = reply.get("bullets", {}) if isinstance(reply, dict) else {}
+    if spec["fixed_order"]:
+        edits = resume_tailor.keep_bullet_order(edits)
 
     # Independent truthfulness check on every reworded bullet (alternates as written are pre-approved)
     pairs = resume_tailor.changed_pairs(bank, edits)
@@ -247,13 +289,15 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
         edits = resume_tailor.drop_rejected(bank, edits, {r.get("id") for r in rejected})
 
     result, sources, changes = resume_tailor.apply_edits(bank, edits, slots)
+    changes.insert(0, {"section": "TEMPLATE", "status": template_name, "reason": why})
     changes += [{"id": r.get("id"), "status": "rejected (fact-check)", "reason": r.get("reason")} for r in rejected]
 
     skills = reply.get("skills") if isinstance(reply, dict) else None
-    skills, trimmed = resume_tailor.fit_skills(skills)
+    skills, trimmed = resume_tailor.fit_skills(skills, spec["skill_line_max"])
     if trimmed:
         changes.append({"section": "SKILLS", "status": "trimmed to fit", "dropped": trimmed})
-    reason = resume_tailor.validate_skills(skills, inventory, base_skills) if skills else "not proposed"
+    reason = (resume_tailor.validate_skills(skills, inventory, base_skills, spec["skill_line_max"])
+              if skills else "not proposed")
     if reason:
         changes.append({"section": "SKILLS", "status": "kept default", "reason": reason})
         skills = None
@@ -595,6 +639,8 @@ Also list gaps (requirement + talking point).""",
 
     # ── Build + compile ───────────────────────────────────────────────────────
     resume_pdf, resume_tex, resume_changes = tailor_resume(client, analysis, custom_prompt, slug, OUTPUT_DIR, job_description)
+    chosen = next((c for c in resume_changes if c.get("section") == "TEMPLATE"), {})
+    analysis = {**analysis, "resume_template": chosen.get("status"), "template_reason": chosen.get("reason")}
     cover_pdf      = trim_cover_to_one_page(structured, slug, client, OUTPUT_DIR)
 
     # Fallback: save .tex files if pdflatex unavailable
@@ -615,6 +661,16 @@ Also list gaps (requirement + talking point).""",
 
 
 # ── Output helpers ─────────────────────────────────────────────────────────────
+
+def template_line(analysis):
+    """'\n🗂 Classic template: <why>' for the tailored-files message, so it's clear which layout was used."""
+    name = analysis.get("resume_template")
+    if not name:
+        return ""
+    why = analysis.get("template_reason") or ""
+    why = "" if why in ("given", "default") else why
+    return f"\n🗂 {name.title()} template" + (f": {why}" if why else "")
+
 
 def gaps_attachment(company, role, gaps_text):
     """(filename, bytes) for the interview-prep gaps file, e.g. Haatim_Ali_Figma_Interview_Prep.txt."""
@@ -664,7 +720,8 @@ async def send_to_discord(channel_id, job_url, resume_pdf, cover_pdf, analysis):
             else:
                 msg = await channel.send(
                     content=f"📎 **Tailored resume + cover letter:** {role} @ {company}"
-                            + (f"\n<{job_url}>" if job_url else ""),
+                            + (f"\n<{job_url}>" if job_url else "")
+                            + template_line(analysis),
                     files=files or discord.utils.MISSING
                 )
                 if job_url and resume_pdf and os.path.exists(resume_pdf):

@@ -1,0 +1,163 @@
+% Haatim Ali Resume, "classic" layout: second template for tailor.py (from ~/Downloads/Haatim_Ali_Resume.tex,
+% the version that got responses before the result-first rewrite). Name left / contact right, story-order
+% bullets with bold tools and numbers, Campus Involvements and Interests.
+% tailor.py may, between the %%X_START%% / %%X_END%% markers only: reword bullets (they keep their order,
+% since they read as a sequence), reorder projects and coursework, and regroup the first three Additional
+% lines. No bullet_bank.yaml alternates are used here: they're written in the other template's style.
+
+\documentclass[letterpaper,10pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\IfFileExists{tgtermes.sty}{\usepackage{tgtermes}}{\usepackage{times}}
+\newlength{\outerbordwidth}
+\pagestyle{empty}
+\raggedbottom
+\raggedright
+\usepackage[svgnames]{xcolor}
+\usepackage{framed}
+\usepackage{tocloft}
+\usepackage{array}
+\usepackage[hidelinks]{hyperref}
+% ATS: make the PDF's text copy/paste and parse as plain words (fi/ff/fl stay separate letters)
+\ifdefined\pdfgentounicode
+  \input{glyphtounicode}
+  \pdfgentounicode=1
+  \usepackage{microtype}
+  \DisableLigatures[f]{encoding = *, family = *}
+\fi
+\hypersetup{pdftitle={Haatim Ali Resume}, pdfauthor={Haatim Ali},
+  pdfsubject={Software Engineering and AI/ML Internship Resume}}
+
+%-----------------------------------------------------------
+\setlength{\outerbordwidth}{1pt}
+\definecolor{shadecolor}{gray}{0.4}
+\definecolor{shadecolorB}{gray}{0.96}
+
+%-----------------------------------------------------------
+% Margins
+\setlength{\evensidemargin}{-0.4in}
+\setlength{\headheight}{0in}
+\setlength{\headsep}{0in}
+\setlength{\oddsidemargin}{-0.4in}
+\setlength{\paperheight}{11in}
+\setlength{\paperwidth}{8.5in}
+\setlength{\tabcolsep}{0in}
+\setlength{\textheight}{10.2in}
+\setlength{\textwidth}{7.3in}
+\setlength{\topmargin}{-0.55in}
+\setlength{\topskip}{0in}
+\setlength{\voffset}{0.0in}
+
+\linespread{0.98}
+
+%-----------------------------------------------------------
+% Custom commands
+\newcommand{\resitem}[1]{\item #1 \vspace{-6pt}}
+\newcommand{\resheading}[1]{\vspace{7pt}{\Large \textbf{#1}}\\\vspace{-8pt}\hrulefill}
+\newcommand{\ressubheading}[4]{\vspace{2pt}
+\begin{tabular*}{7.0in}{l@{\cftdotfill{\cftsecdotsep}\extracolsep{\fill}}r}
+        \textbf{#1} & #2 \\
+        \textit{#3} & \textit{#4} \\
+\end{tabular*}\vspace{-6pt}}
+\newcommand{\ressubheadingsmol}[2]{\vspace{1pt}
+\begin{tabular*}{7.0in}{l@{\cftdotfill{\cftsecdotsep}\extracolsep{\fill}}r}
+        \textbf{#1} & \textit{#2} \\
+\end{tabular*}\vspace{-6pt}}
+%-----------------------------------------------------------
+
+\begin{document}
+
+\begin{tabular*}{7in}{l@{\extracolsep{\fill}}r}
+\textbf{\huge Haatim Ali} & htali@ucsc.edu \\
+Fremont, CA $\cdot$ (510) 468-7997 & \href{https://www.linkedin.com/in/haatim-ali}{linkedin.com/in/haatim-ali} $\cdot$ \href{https://github.com/Haatim-Ali}{github.com/Haatim-Ali} \\
+\end{tabular*}
+\\
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\resheading{Education}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\ressubheading{University of California, Santa Cruz}{Santa Cruz, CA}{B.S. Computer Science}{Expected March 2028}
+\begin{itemize}
+% %%COURSEWORK_START%%
+    \resitem{\textbf{Relevant Coursework:} Calculus I--II, Linear Algebra, Discrete Mathematics, Statistics, Python Programming, C++~Programming, Computer Programming in~C, Computer Systems \& Assembly Language}
+% %%COURSEWORK_END%%
+    \resitem{\textbf{Campus Involvements:} Alpha Kappa Psi (Historian, Professional Development \& Tech Committee), Grappling Club}
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\resheading{Professional Experience}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\ressubheading{Undergraduate Research Assistant --- Autonomous Vehicles}{Santa Cruz, CA}{AIEA Lab}{May 2026 -- Present}
+\begin{itemize}
+% %%AIEA_BULLETS_START%%
+    \resitem{Containerized \textbf{PyTorch} CNN training on CIFAR-10 as GPU-backed \textbf{Kubernetes} Jobs on the Nautilus cluster, persisting results to PVCs so pods exit after training, eliminating idle GPU-node costs}
+    \resitem{Moved from classification to control, benchmarking \textbf{5} RL algorithms (PPO, DQN, SAC, DDPG, SB3 baseline) on CarRacing-v2 and comparing reward/loss convergence in TensorBoard}
+    \resitem{Turned those one-off runs into a single-file benchmarking framework that automates training, hyperparameter sweeps, and reward-curve generation for \textbf{3+} algorithms in parallel}
+% %%AIEA_BULLETS_END%%
+\end{itemize}
+
+\ressubheading{Website Developer}{Milpitas, CA}{Golden Harvest Montessori}{June 2022 -- Present}
+\begin{itemize}
+% %%MONTESSORI_BULLETS_START%%
+    \resitem{Founded and led a \textbf{3}-person team to build a school website from scratch, now driving \textbf{150+} parent enrollments over \textbf{3} years}
+    \resitem{Kept it live by tracing an outage on \textbf{6} of \textbf{8} pages to a legacy CMS stripping script tags and restoring jQuery/Bootstrap}
+    \resitem{Then refactored inline styles into a modular per-page CSS system, cutting \textbf{18+} dead rules with \textbf{zero} visual regressions}
+% %%MONTESSORI_BULLETS_END%%
+\end{itemize}
+
+\ressubheading{Python Programming Camp Instructor}{Milpitas, CA}{Golden Harvest Montessori}{Summers 2022 -- 2025}
+\begin{itemize}
+    \resitem{Designed a \textbf{20+} lesson, 4-week Python curriculum teaching syntax, control flow, functions, and debugging through projects}
+    \resitem{Recruited, trained, and managed \textbf{2} volunteer TAs to give 1:1 debugging help across \textbf{6+} hours of daily instruction}
+    \resitem{Taught \textbf{30+} students ages 6--12 to a \textbf{100\%} project completion and live-demo rate, leading the school to adopt the curriculum as its standard summer CS program for \textbf{4} straight years}
+\end{itemize}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\resheading{Projects}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% %%PROJECTS_START%%
+\ressubheading{Uplink --- Multi-Agent Food Rescue Negotiation}{\href{https://github.com/Haatim-Ali/uplink}{github.com/Haatim-Ali/uplink}}{UCSC AI Hackathon 2026, Cisco ``When AI Agents Disagree'' track (team of 3)}{October 2026}
+\begin{itemize}
+% %%UPLINK_BULLETS_START%%
+    \resitem{Co-built a food-rescue system where donations arrive by \textbf{Claude} photo counting or \textbf{ElevenLabs} voice, then \textbf{3 Claude} agents with competing goals (speed, cost, need) propose, vote, and veto each delivery}
+    \resitem{Distributed it into \textbf{16} independent agent processes on Cisco's \textbf{AGNTCY A2A protocol over NATS} with an agent directory and heartbeats, matching in-process decisions with \textbf{0} failed messages}
+    \resitem{On \textbf{100} held-out scenarios, cut food lost by \textbf{93\%} vs. a nearest-shelter baseline and \textbf{67\%} vs. the best single agent, with photo counts within 10\% on \textbf{33} of \textbf{34} test reads}
+% %%UPLINK_BULLETS_END%%
+\end{itemize}
+
+\ressubheading{Pathwise --- Autonomous Planning Agent}{\href{https://github.com/Haatim-Ali/pathwise}{github.com/Haatim-Ali/pathwise}}{Hack-a-Claw 2026, 24-hour NVIDIA hackathon at UCSC Baskin Engineering (team of 3)}{May 2026}
+\begin{itemize}
+% %%PATHWISE_BULLETS_START%%
+    \resitem{Built an agent turning plain-English finances into a month-by-month plan, reasoning with \textbf{NVIDIA Nemotron 49B via NIM}}
+    \resitem{Grounded plans in live HYSA, mortgage, and S\&P 500 rates via the Tavily API, with persistent memory and what-if scenarios that re-plan on demand}
+    \resitem{Shipped a \textbf{Flask + Chart.js} full-stack demo of payoff timelines, surplus allocation, and net worth trajectory within \textbf{24 hours}, submitted to the Cloud and Best for UCSC tracks}
+% %%PATHWISE_BULLETS_END%%
+\end{itemize}
+
+\ressubheading{JobAgent --- Autonomous Internship Search \& Tailoring Pipeline}{\href{https://github.com/Haatim-Ali/job-agent-v2}{github.com/Haatim-Ali/job-agent-v2}}{Personal project, built out from a 2-person prototype}{March 2026 -- Present}
+\begin{itemize}
+% %%JOBAGENT_BULLETS_START%%
+    \resitem{Runs \textbf{24/7} on a Debian VPS, pulling LinkedIn and \textbf{7} job-board APIs every \textbf{30 min}; a cost-ordered filter funnel screened \textbf{49,000+} postings down to \textbf{522} \textbf{Claude Haiku}-scored alerts}
+    \resitem{Each alert gets a LaTeX resume and cover letter tailored by \textbf{Claude Sonnet}, guarded by an independent fact-check pass that rejects any added skill, metric, or claim}
+    \resitem{Kept it dependable with \textbf{195} automated tests, CI, and a deploy script that auto-rolls back on failure; a \textbf{Discord bot} feeds my rejection reasons back into scoring}
+% %%JOBAGENT_BULLETS_END%%
+\end{itemize}
+% %%PROJECTS_END%%
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\resheading{Additional}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\vspace{-6pt}
+\begin{itemize}
+% %%SKILLS_START%%
+    \resitem{\textbf{Languages:} Python, Java, C++, C, JavaScript/TypeScript, SQL, HTML/CSS, Assembly}
+    \resitem{\textbf{Frameworks \& Tools:} PyTorch, TensorBoard, Flask, Next.js, Chart.js, jQuery, Bootstrap, Supabase/PostgreSQL, Kubernetes, Linux, Git, CI, LaTeX}
+    \resitem{\textbf{AI/ML \& Agents:} Claude API, Claude Code, NVIDIA NIM, ElevenLabs, AGNTCY/A2A, NATS, Tavily, Stable Baselines3, Reinforcement Learning, CNNs}
+% %%SKILLS_END%%
+    \resitem{\textbf{Interests:} Weightlifting, Soccer, Hiking, Jiu-jitsu, Anime}
+\end{itemize}
+
+\end{document}
