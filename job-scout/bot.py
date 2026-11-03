@@ -60,6 +60,14 @@ def is_owner(user_id):
     return not DISCORD_USER_ID or user_id == DISCORD_USER_ID
 
 
+def split_alert_title(title):
+    """("Role", "Company") from an alert card title "Role @ Company"; (None, None) otherwise."""
+    role, sep, company = str(title or "").rpartition(" @ ")
+    if not sep or not role.strip() or not company.strip() or company.strip() == "Unknown":
+        return None, None
+    return role.strip(), company.strip()
+
+
 def bot_channels():
     """Channels whose messages and reactions the bot handles."""
     return {c for c in (CHANNEL_ID, REQUESTS_CHANNEL_ID, ACTIONS_CHANNEL_ID) if c}
@@ -370,8 +378,11 @@ async def on_raw_reaction_add(payload):
         )
         logging.info(f"Tailoring triggered for: {job_url} (custom_prompt: {custom_prompt[:100]})")
 
-        # Build command args
+        # Build command args. The alert card's "Role @ Company" is passed along so the files and
+        # cover letter name the right company even when the scraped page leaves it out.
         tailor_cmd = [VENV_PYTHON, os.path.join(SCRIPT_DIR, "tailor.py"), job_url, str(reply_id)]
+        role, company = split_alert_title(role_name)
+        tailor_cmd += (["--role", role] if role else []) + (["--company", company] if company else [])
         if custom_prompt:
             tailor_cmd.extend(["--prompt", custom_prompt])
 

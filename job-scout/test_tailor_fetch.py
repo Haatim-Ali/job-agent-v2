@@ -49,3 +49,24 @@ def test_plain_html_posting_still_read(monkeypatch):
     html = f"<html><body><script>var x = {{}};</script><div class='description'>{PROSE}</div></body></html>"
     monkeypatch.setattr(tailor.requests, "get", lambda url, **kw: Resp(text=html))
     assert "synthetic data" in tailor.fetch_job_description("https://example.com/jobs/1")
+
+
+def test_page_title_is_kept_with_the_description_section(monkeypatch):
+    """Regression: a Greenhouse section without the company made Claude name it "unknown"."""
+    html = (f"<html><head><title>Job Application for Intern, AI Engineer at Samsung Semiconductor</title>"
+            f"</head><body><div class='job__description'>{PROSE}</div></body></html>")
+    monkeypatch.setattr(tailor, "fetch_eightfold_description", lambda url, headers: None)
+    monkeypatch.setattr(tailor.requests, "get", lambda *a, **k: Resp(html))
+    text = tailor.fetch_job_description("https://job-boards.greenhouse.io/x/jobs/1")
+    assert text.startswith("Job Application for Intern, AI Engineer at Samsung Semiconductor")
+    assert "Autonomous Vehicle" in text
+
+
+def test_known_role_and_company_win():
+    assert tailor.with_known_job("JD", "SWE Intern", "Samsung").startswith("Role: SWE Intern\nCompany: Samsung\n\nJD")
+    assert tailor.with_known_job("JD") == "JD"
+    a = tailor.apply_known_job({"role_title": "x", "company": "unknown", "company_slug": "unknown"},
+                               "SWE Intern", "Samsung Semiconductor")
+    assert a == {"role_title": "SWE Intern", "company": "Samsung Semiconductor",
+                 "company_slug": "samsung-semiconductor"}
+    assert tailor.apply_known_job({"company": "Figma"})["company"] == "Figma"

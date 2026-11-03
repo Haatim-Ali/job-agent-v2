@@ -391,7 +391,9 @@ def fetch_job_description(url):
         ]:
             el = soup.select_one(selector)
             if el and looks_like_prose(el.get_text(separator="\n", strip=True)):
-                return el.get_text(separator="\n", strip=True)
+                # the page title usually names the role and company; the section often doesn't
+                title = soup.title.get_text(strip=True) if soup.title else ""
+                return "\n\n".join(x for x in (title, el.get_text(separator="\n", strip=True)) if x)
         for junk in soup(["script", "style", "noscript"]):
             junk.decompose()
         body = soup.find("body")
@@ -485,7 +487,29 @@ MATCHING_SCHEMA = obj({"lead_experience": STR, "cover_letter_angle": STR, "gaps"
 
 # ── Core tailor ────────────────────────────────────────────────────────────────
 
-def tailor(job_url, job_description=None, custom_prompt=""):
+def slugify(name):
+    return re.sub(r"[^a-z0-9]+", "-", str(name).lower()).strip("-") or "company"
+
+
+def with_known_job(job_description, role=None, company=None):
+    """Put the role and company the alert already knows at the top of the description. Scraped
+    pages often leave them out (a LinkedIn description body, one Greenhouse section), and then
+    Claude named the company "unknown" in the files and the cover letter."""
+    header = "\n".join(f"{k}: {v}" for k, v in (("Role", role), ("Company", company)) if v)
+    return f"{header}\n\n{job_description}" if header else job_description
+
+
+def apply_known_job(analysis, role=None, company=None):
+    """The alert's role and company win over what Claude read from the page."""
+    if role:
+        analysis["role_title"] = role
+    if company:
+        analysis["company"] = company
+        analysis["company_slug"] = slugify(company)
+    return analysis
+
+
+def tailor(job_url, job_description=None, custom_prompt="", role=None, company=None):
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     kb     = load_kb()
     kb_system = cached_system(kb_system_text(kb))
@@ -495,6 +519,7 @@ def tailor(job_url, job_description=None, custom_prompt=""):
         job_description = fetch_job_description(job_url)
     if not job_description:
         return None, None, {"error": "Could not fetch job description"}
+    job_description = with_known_job(job_description, role, company)
 
     # ── Pass 1: Analyze JD ────────────────────────────────────────────────────
     logging.info("Pass 1: Analyzing JD")
@@ -510,6 +535,7 @@ ats_keywords: 12-15 keywords an applicant tracking system would scan for. tone: 
     except (ClaudeJSONError, anthropic.APIError, ValueError) as e:
         logging.warning(f"Pass 1 failed, using defaults: {e}")
         analysis = {"role_title": "Role", "company": "Company", "company_slug": "company"}
+    analysis = apply_known_job(analysis, role, company)
 
     # ── Pass 2: Match experience ──────────────────────────────────────────────
     logging.info("Pass 2: Matching experience")
@@ -670,6 +696,8 @@ def main():
     parser.add_argument("channel_id", nargs="?", default=None, help="Discord channel ID to send results to")
     parser.add_argument("--prompt", default="", help="Custom instructions for tailoring")
     parser.add_argument("--jd-file", default="", help="Path to a text file containing the job description (skips URL fetch)")
+    parser.add_argument("--role", default="", help="Job title, when known (e.g. from the alert card)")
+    parser.add_argument("--company", default="", help="Company name, when known (e.g. from the alert card)")
     args = parser.parse_args()
 
     job_url       = args.job_url if args.job_url != "no-url" else None
@@ -684,7 +712,9 @@ def main():
         logging.info(f"Loaded JD from file: {args.jd_file} ({len(job_description)} chars)")
 
     logging.info(f"Starting tailor: {job_url or '(from file)'} (custom: {custom_prompt[:100]})")
-    resume_pdf, cover_pdf, analysis = tailor(job_url or "no-url", job_description=job_description, custom_prompt=custom_prompt)
+    resume_pdf, cover_pdf, analysis = tailor(job_url or "no-url", job_description=job_description,
+                                             custom_prompt=custom_prompt, role=args.role or None,
+                                             company=args.company or None)
 
     if channel_id:
         asyncio.run(send_to_discord(channel_id, job_url, resume_pdf, cover_pdf, analysis))

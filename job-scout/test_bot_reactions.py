@@ -79,3 +79,14 @@ def test_only_the_owner_can_trigger_anything(monkeypatch):
 def test_everyone_counts_without_an_owner_id(monkeypatch):
     monkeypatch.setattr(bot, "DISCORD_USER_ID", 0)
     assert bot.is_owner(7)
+
+
+@pytest.mark.parametrize("title, expected", [
+    ("Intern, AI Application Engineer @ Samsung Semiconductor", ("Intern, AI Application Engineer", "Samsung Semiconductor")),
+    ("R&D @ Home Intern @ Acme", ("R&D @ Home Intern", "Acme")),
+    ("Data Intern @ Unknown", (None, None)),
+    ("this role", (None, None)),
+    (None, (None, None)),
+])
+def test_split_alert_title(title, expected):
+    assert bot.split_alert_title(title) == expected

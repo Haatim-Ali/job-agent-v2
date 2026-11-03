@@ -505,7 +505,7 @@ The bot is built with **discord.py**, which is **asynchronous**: it runs an **ev
 
 | Reaction | What happens |
 |---|---|
-| 👍 | Replies "On it!", then runs `tailor.py <job_url> <channel_id>` as a **subprocess** (a separate program) with a 180-second timeout. `tailor.py` posts the resume and cover letter back itself, named `Haatim_Ali_<Company>_Resume.pdf` and `Haatim_Ali_<Company>_Cover_Letter.pdf`, and records which resume went with the job. |
+| 👍 | Replies "On it!", then runs `tailor.py <job_url> <channel_id> --role <role> --company <company>` as a **subprocess** (a separate program) with a 180-second timeout. `tailor.py` posts the resume and cover letter back itself, named `Haatim_Ali_<Company>_Resume.pdf` and `Haatim_Ali_<Company>_Cover_Letter.pdf`, and records which resume went with the job. Role and company come from the alert card's "Role @ Company" title (`split_alert_title`), so they're right even when the scraped page leaves them out (since 2026-11-03). |
 | ✅ (or the older 📨) | Reads the job URL and "Role @ Company" from the embed, writes a row to `applications`, looks up the resume used (`apply_prep.resume_used`), and writes the Google Sheet row. Replies with what changed in the sheet. |
 | ❌ | Asks "Why are you passing?" and remembers that it's waiting for your answer. Your next message is saved to `rejections` as the reason ("skip" saves none). |
 
@@ -1063,6 +1063,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-11-03: 👍 tailoring always knows the company.** Two 👍 runs named their files (and cover letters) "unknown" and "not-specified" because the scraped text had no company: a LinkedIn description body and one Greenhouse section. The bot now passes the alert card's role and company to `tailor.py` (`--role`, `--company`), which puts them at the top of the description and uses them over Claude's reading (`with_known_job`, `apply_known_job`), and `fetch_job_description` keeps the page title with the section it picks. 7 tests added.
 
 **2026-11-01: every company board behind the Simplify list.** `harvest_simplify_boards` collects the ~2,580 boards linked from this season's Simplify listings and checks a quarter of them each run (each one every 2 hours). New adapters for Oracle Recruiting Cloud, Workable and Rippling; Workday links on `myworkdaysite.com` are read too. `fetch_simplify` split into `download_simplify` + `simplify_jobs` so the list is downloaded once per run. 12 fetch threads instead of 8. 7 tests added.
 
