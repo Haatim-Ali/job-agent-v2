@@ -548,3 +548,47 @@ class TestEveryBoard:
         jobs = cs.fetch_rippling("fr")
         assert [(j["job_url"], j["company"], j["description"]) for j in jobs] == [
             ("https://ats.rippling.com/fr/jobs/a", "Foundation", "Us\n\nRobots")]
+
+
+class TestApple:
+    """2026-11-04: jobs.apple.com (Internships team), parsed from the page's embedded JSON."""
+
+    @staticmethod
+    def _page(results, total):
+        import json
+        data = json.dumps({"loaderData": {"search": {"searchResults": results, "totalRecords": total}}})
+        return f'<script>window.__staticRouterHydrationData = JSON.parse({json.dumps(data)});</script>'
+
+    def test_fetch_apple_keeps_recent_and_stops_at_old(self, monkeypatch):
+        pages = []
+
+        class R:
+            def __init__(self, text):
+                self.text = text
+
+            def raise_for_status(self):
+                pass
+
+        def get(url, params=None, **kw):
+            pages.append(params["page"])
+            return R(self._page([
+                {"postingTitle": "Software Engineering Internships", "positionId": "200", "transformedPostingTitle": "swe",
+                 "postDateInGMT": _ago(5), "jobSummary": "Build iOS", "locations": [{"name": "Cupertino"}, {"name": "Austin"}]},
+                {"postingTitle": "MBA Internships", "positionId": "201", "transformedPostingTitle": "mba",
+                 "postDateInGMT": _ago(900), "locations": []}], total=60))
+        monkeypatch.setattr(cs.requests, "get", get)
+        jobs = cs.fetch_apple("internships-STDNT-INTRN")
+        assert pages == [1]   # the page ended in an old posting, so no page 2
+        assert [(j["title"], j["company"], j["location"], j["job_url"], j["description"]) for j in jobs] == [
+            ("Software Engineering Internships", "Apple", "Cupertino; Austin",
+             "https://jobs.apple.com/en-us/details/200/swe", "Build iOS")]
+
+    def test_fetch_apple_page_without_data_fails_loudly(self, monkeypatch):
+        class R:
+            text = "<html>blocked</html>"
+
+            def raise_for_status(self):
+                pass
+        monkeypatch.setattr(cs.requests, "get", lambda *a, **k: R())
+        with pytest.raises(ValueError):
+            cs.fetch_apple("internships-STDNT-INTRN")

@@ -2,7 +2,8 @@
 Career-site sources: pull postings straight from company job boards instead of LinkedIn.
 
 Greenhouse, Lever, Ashby and SmartRecruiters expose public JSON job boards; Workday and
-Eightfold career sites call hidden JSON APIs; Amazon has its own search JSON; SimplifyJobs publishes the
+Eightfold career sites call hidden JSON APIs; Amazon has its own search JSON; Apple embeds
+its search results in the page; SimplifyJobs publishes the
 community-curated Summer 2027 internship list as one JSON file.
 Each fetcher returns job dicts shaped like a JobSpy row so scraper.process_jobs() can use them.
 """
@@ -394,6 +395,37 @@ def fetch_rippling(board, max_age_hours=72):
     return jobs
 
 
+_APPLE_DATA = re.compile(r'window\.__staticRouterHydrationData\s*=\s*JSON\.parse\("(.*?)"\);', re.S)
+
+
+def fetch_apple(team, pages=3, max_age_hours=72):
+    """jobs.apple.com search pages, newest first. There's no public JSON API; each page embeds its
+    results as a JSON string. team: an Apple team filter, e.g. "internships-STDNT-INTRN"."""
+    import json
+    jobs, cutoff = [], datetime.now(timezone.utc) - timedelta(hours=max_age_hours)
+    for page in range(1, pages + 1):
+        resp = requests.get("https://jobs.apple.com/en-us/search", headers=HEADERS, timeout=TIMEOUT,
+                            params={"team": team, "location": "united-states-USA", "sort": "newest", "page": page})
+        resp.raise_for_status()
+        m = _APPLE_DATA.search(resp.text)
+        if not m:
+            raise ValueError("Apple search page has no embedded results")
+        search = json.loads(json.loads(f'"{m.group(1)}"'))["loaderData"]["search"]
+        results = search.get("searchResults") or []
+        for r in results:
+            posted = _parse_dt(r.get("postDateInGMT"))
+            if posted is None or posted < cutoff:
+                continue
+            location = "; ".join(l.get("name", "") for l in r.get("locations") or [])
+            jobs.append(_job(r.get("postingTitle", ""), "Apple", location,
+                             f"https://jobs.apple.com/en-us/details/{r.get('positionId')}/{r.get('transformedPostingTitle', '')}",
+                             r.get("jobSummary", ""), posted, "apple", team))
+        oldest = _parse_dt(results[-1].get("postDateInGMT")) if results else None
+        if not results or oldest is None or oldest < cutoff or page * 20 >= (search.get("totalRecords") or 0):
+            break
+    return jobs
+
+
 def board_from_listing(url, company):
     """(ats, spec) for any posting link a fetcher here can read, else None. Like _ats_from_url, plus
     the sources that need a company name or aren't used for application packets."""
@@ -583,6 +615,7 @@ def fetch_all(cfg, role_keywords, intern_keywords, exclude_titles, watch=(), als
         + [(fetch_oracle, o, aged) for o in cfg.get("oracle", [])]
         + [(fetch_workable, w, {}) for w in cfg.get("workable", [])]
         + [(fetch_rippling, r, aged) for r in cfg.get("rippling", [])]
+        + [(fetch_apple, t, aged) for t in cfg.get("apple", [])]
         + [(fetch_amazon, q, {}) for q in cfg.get("amazon_queries", [])]
         + [(lambda _: simplify, "simplify", {})]
     )

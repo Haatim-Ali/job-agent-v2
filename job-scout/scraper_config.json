@@ -133,7 +133,12 @@
       "point72",
       "towerresearchcapital",
       "wehrtyou",
-      "janestreet"
+      "janestreet",
+      "hubspotjobs",
+      "pitchbookdata",
+      "8451",
+      "arcesiumllc",
+      "masterclass"
     ],
     "lever": [
       "palantir",
@@ -167,13 +172,21 @@
       "crusoe",
       "lambda",
       "pinecone",
-      "runway"
+      "runway",
+      "uipath",
+      "seconddinner"
     ],
     "amazon_queries": [
       "software development engineer intern",
       "machine learning intern",
       "data science intern",
       "product manager intern"
+    ],
+    "apple": [
+      "internships-STDNT-INTRN"
+    ],
+    "workable": [
+      "clear-labs"
     ],
     "smartrecruiters": [
       "ServiceNow",
