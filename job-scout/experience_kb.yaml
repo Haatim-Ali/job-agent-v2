@@ -145,10 +145,14 @@ projects:
     dates: March 2026 - Present
     link: github.com/Haatim-Ali/job-agent-v2
     bullets:
-      - "Screened 49,000+ postings down to 522 Claude Haiku-scored alerts with a 24/7 Python pipeline on a Linux VPS that pulls LinkedIn and 7 job-board APIs every 30 min"
+      - "Screened 58,000+ postings down to 1,200+ Claude Haiku-scored alerts with a 24/7 Python pipeline on a Linux VPS that runs every 30 min across LinkedIn and 2,500+ company job boards"
       - "Produced a tailored LaTeX resume and cover letter for every alert using Claude Sonnet structured outputs, with an independent fact-check that blocks any unsupported skill, metric, or claim"
-      - "Kept the system dependable with 200+ automated tests, GitHub Actions CI, and a deploy script that auto-rolls back on failure, plus a Discord bot that feeds rejection reasons back into scoring"
+      - "Kept the system dependable with 330+ automated tests, GitHub Actions CI, and a deploy script that auto-rolls back on failure, plus a Discord bot that feeds rejection reasons back into scoring"
       - "Ensured every resume targets the real posting by reading JavaScript-heavy career sites through job APIs and a headless Playwright browser, rejecting non-prose pages"
+    key_metrics:
+      - "58,000+ postings screened down to 1,200+ alerts (Jul 26 - Nov 4, 2026)"
+      - "LinkedIn plus 2,500+ company job boards (Greenhouse, Lever, Ashby, Workday, SmartRecruiters, Oracle, Workable, Rippling, Eightfold, SuccessFactors, Amazon, Apple)"
+      - "330+ automated tests run by GitHub Actions CI and on every deploy"
 
 interests:
   - Weightlifting
