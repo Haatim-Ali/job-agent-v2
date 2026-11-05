@@ -33,7 +33,7 @@ def test_template_disables_ligatures_for_ats():
 
 def test_every_section_has_its_bullets():
     assert {m: len(b) for m, b in SECTIONS.items()} == {
-        "AIEA_BULLETS": 3, "MONTESSORI_BULLETS": 3, "JOBAGENT_BULLETS": 4, "UPLINK_BULLETS": 4, "PATHWISE_BULLETS": 3}
+        "AIEA_BULLETS": 3, "MONTESSORI_BULLETS": 3, "JOBAGENT_BULLETS": 3, "UPLINK_BULLETS": 3, "PATHWISE_BULLETS": 3}
 
 
 def test_template_bullets_have_no_bold():
@@ -227,7 +227,7 @@ def test_bank_bullets_have_no_em_dash_or_bold():
 def test_alternate_can_replace_a_default_and_is_reported():
     m = "UPLINK_BULLETS"
     alt = SLOTS[m]          # first alternate
-    pick = [alt, 0, 1, 2]
+    pick = [alt, 0, 1]
     edits = {m: [{"id": f"{m}-{i}", "text": rt.latex_to_marked(BANK[m][i])} for i in pick]}
     result, sources, changes = rt.apply_edits(BANK, edits, SLOTS)
     assert result[m][0] == BANK[m][alt] and len(result[m]) == SLOTS[m]
@@ -246,10 +246,10 @@ def test_wrong_number_of_picks_keeps_defaults():
 def test_revert_alternate_swaps_back_an_unused_default():
     m = "JOBAGENT_BULLETS"
     alt = SLOTS[m] + 1
-    edits = {m: [{"id": f"{m}-{i}", "text": rt.latex_to_marked(BANK[m][i])} for i in (0, alt, 1, 2)]}
+    edits = {m: [{"id": f"{m}-{i}", "text": rt.latex_to_marked(BANK[m][i])} for i in (0, alt, 1)]}
     result, sources, changes = rt.apply_edits(BANK, edits, SLOTS)
     assert rt.revert_alternate(result, sources, BANK, SLOTS, changes)
-    assert result[m][1] == BANK[m][3] and sources[m][1] == f"{m}-3"
+    assert result[m][1] == BANK[m][2] and sources[m][1] == f"{m}-2"
     assert not rt.revert_alternate(result, sources, BANK, SLOTS, changes)
 
 
@@ -306,7 +306,7 @@ def test_prompt_lists_alternates_projects_and_skill_inventory():
     p = rt.build_prompt(BANK, {"role_title": "R", "company": "C"}, slots=SLOTS,
                         projects=["JobAgent", "Uplink", "Pathwise"],
                         coursework=rt.extract_coursework(TEMPLATE), skills=sk, inventory=inv)
-    assert "// alternate" in p and "pick exactly 4" in p
+    assert "// alternate" in p and "pick exactly 3" in p
     assert "project_order" in p and "coursework_order" in p and "Playwright" in p
 
 
