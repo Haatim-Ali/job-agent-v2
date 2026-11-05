@@ -100,13 +100,14 @@ def _resitem_args(body):
 
 
 def extract_sections(tex):
-    """{marker: [bullet LaTeX, ...]} for every tailorable section in the template."""
+    """{marker: [bullet LaTeX, ...]} for every tailorable section in the template, with the number
+    bolding taken off (render() puts it back, so Claude never has to manage it)."""
     out = {}
     for marker in SECTIONS:
         body = _section_body(tex, marker)
         if body is None:
             raise ValueError(f"Resume template is missing section {marker}")
-        out[marker] = _resitem_args(body)
+        out[marker] = [unbold_numbers(b) for b in _resitem_args(body)]
     return out
 
 
@@ -399,9 +400,34 @@ def render_skills(tex, lines, inventory=None):
     return _replace_block(tex, "SKILLS", body)
 
 
+# A quantity: 58,000+  1,200+  100\%  16  3-person. Not part of a name or code (CIFAR-10, CarRacing-v2,
+# SB3, Nemotron 49B, Qwen2.5), a ratio (1:1), a range (ages 6--12), S\&P 500, or a year.
+_QUANTITY = re.compile(r"(?<![\w\-/.:\\])(?<!S\\&P )(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?(?:\+|\\%)?(?![\w/:]|--|\.\d)")
+_BOLD = re.compile(r"(\\textbf\{[^{}]*\})")
+
+
+def bold_numbers(bullet):
+    """Bold every quantity in a LaTeX bullet (Haatim wants numbers and percentages to stand out),
+    leaving text that's already bold alone. 24/7 counts as one quantity."""
+    def quantities(text):
+        text = re.sub(r"(?<![\w/])24/7(?![\w/])", r"\\textbf{24/7}", text)
+        parts = _BOLD.split(text)
+        return "".join(p if i % 2 else _QUANTITY.sub(
+            lambda m: m.group(0) if re.fullmatch(r"(?:19|20)\d\d", m.group(0)) else f"\\textbf{{{m.group(0)}}}", p)
+            for i, p in enumerate(parts))
+    return "".join(p if i % 2 else quantities(p) for i, p in enumerate(_BOLD.split(bullet)))
+
+
+def unbold_numbers(bullet):
+    """Undo bold_numbers: drop \\textbf around a bare quantity, keep other bold (tools, names)."""
+    return re.sub(r"\\textbf\{([^{}]*)\}",
+                  lambda m: m.group(1) if _QUANTITY.fullmatch(m.group(1)) or m.group(1) == "24/7" else m.group(0),
+                  bullet)
+
+
 def render(tex, sections):
     for marker, bullets in sections.items():
-        body = "".join(f"    \\resitem{{{b}}}\n" for b in bullets)
+        body = "".join(f"    \\resitem{{{bold_numbers(b)}}}\n" for b in bullets)
         tex = re.sub(rf"(% %%{marker}_START%%\n).*?(% %%{marker}_END%%)",
                      lambda m: m.group(1) + body + m.group(2), tex, flags=re.DOTALL)
     return tex

@@ -234,7 +234,8 @@ def tailor_resume(client, analysis, custom_prompt, slug, output_dir, job_descrip
     base_skills = resume_tailor.extract_skills(template)
     inventory = resume_tailor.skill_inventory(base_skills, kb_skill_list(), skill_extras)
 
-    baseline_pdf = compile_pdf(template, f"_baseline_{slug}", output_dir)
+    # measured as rendered (numbers bolded), so the layout guard compares like with like
+    baseline_pdf = compile_pdf(resume_tailor.render(template, defaults), f"_baseline_{slug}", output_dir)
     baseline_lines = count_lines(baseline_pdf)
     if baseline_pdf and os.path.exists(baseline_pdf):
         os.remove(baseline_pdf)

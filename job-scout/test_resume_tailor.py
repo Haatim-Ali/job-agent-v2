@@ -5,6 +5,8 @@ Run with: python -m pytest job-scout/test_resume_tailor.py -v
 
 import os
 
+import re
+
 import pytest
 
 import resume_tailor as rt
@@ -36,7 +38,11 @@ def test_every_section_has_its_bullets():
         "AIEA_BULLETS": 3, "MONTESSORI_BULLETS": 3, "JOBAGENT_BULLETS": 3, "UPLINK_BULLETS": 3, "PATHWISE_BULLETS": 3}
 
 
-def test_template_bullets_have_no_bold():
+def test_template_bullets_bold_their_numbers():
+    # numbers are the only bold in the results template (since 2026-11-05), so rendering leaves it as is
+    raw = re.findall(r"\\resitem\{(.*)\}", TEMPLATE)
+    assert raw and all(rt.bold_numbers(b) == b for b in raw)
+    # sections are read without it, so Claude sees plain bullets and render() restores the template
     assert all("\\textbf" not in b for bullets in SECTIONS.values() for b in bullets)
 
 
@@ -383,3 +389,32 @@ def test_classic_skill_lines_may_wrap_to_two_lines():
     assert rt.validate_skills(long_line, inv, skills) is not None                  # too long for the one-line layout
     assert rt.validate_skills(long_line, inv, skills, rt.TEMPLATES["classic"]["skill_line_max"]) is None
     assert rt.fit_skills(long_line, rt.TEMPLATES["classic"]["skill_line_max"])[1] == []
+
+
+class TestBoldNumbers:
+    """2026-11-05: quantities are bolded in every rendered bullet, in both templates."""
+
+    @pytest.mark.parametrize("text, bolded", [
+        (r"Screened 58,000+ postings down to 1,200+ alerts", [r"58,000+", r"1,200+"]),
+        (r"Cut food lost by 67\% and 93\% on 100 scenarios", [r"67\%", r"93\%", "100"]),
+        (r"a 24/7 pipeline every 30 min", ["24/7", "30"]),
+        (r"founding a 3-person team over 3 years", ["3", "3"]),
+    ])
+    def test_bolds_quantities(self, text, bolded):
+        out = rt.bold_numbers(text)
+        assert re.findall(r"\\textbf\{([^{}]*)\}", out) == bolded
+
+    @pytest.mark.parametrize("text", [
+        "a PyTorch CNN on CIFAR-10", "PPO and SB3 on CarRacing-v2", "NVIDIA Nemotron 49B via NIM",
+        r"live S\&P 500 rates", "ages 6--12", "1:1 debugging help", "Qwen2.5-VL-7B on an L4", "Summer 2027", "A2A protocol",
+    ])
+    def test_leaves_names_ratios_ranges_and_years(self, text):
+        assert rt.bold_numbers(text) == text
+
+    def test_already_bold_text_is_not_bolded_twice(self):
+        s = r"a \textbf{3}-person team, \textbf{Claude 3} agents, 150+ enrollments"
+        assert rt.bold_numbers(s) == r"a \textbf{3}-person team, \textbf{Claude 3} agents, \textbf{150+} enrollments"
+
+    def test_render_bolds_bullets(self):
+        out = rt.render(TEMPLATE, {"UPLINK_BULLETS": [r"Scaled to 16 processes"]})
+        assert r"\resitem{Scaled to \textbf{16} processes}" in out
