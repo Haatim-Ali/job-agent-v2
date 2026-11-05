@@ -92,7 +92,7 @@ Fremont, CA $\cdot$ (510) 468-7997 & \href{https://www.linkedin.com/in/haatim-al
 \ressubheading{Undergraduate Research Assistant --- Autonomous Vehicles}{Santa Cruz, CA}{AI Explainability and Accountability (AIEA) Lab}{May 2026 -- Present}
 \begin{itemize}
 % %%AIEA_BULLETS_START%%
-    \resitem{Containerized \textbf{PyTorch} CNN training on CIFAR-10 as GPU-backed \textbf{Kubernetes} Jobs on Nautilus in place of an always-on GPU Deployment, saving results to a PVC so pods exit when done, eliminating idle GPU costs}
+    \resitem{Containerized \textbf{PyTorch} CNN training on CIFAR-10 as GPU-backed \textbf{Kubernetes} Jobs on the Nautilus cluster, persisting results to PVCs so pods exit after training, eliminating idle GPU-node costs}
     \resitem{Moved from classification to control, benchmarking \textbf{5} RL algorithms (PPO, DQN, SAC, DDPG, SB3 baseline) on CarRacing-v2 and comparing reward/loss convergence in \textbf{TensorBoard}}
     \resitem{Turned those one-off runs into a single-file benchmarking framework that automates training, hyperparameter sweeps, and reward-curve generation for \textbf{3+} algorithms in parallel}
 % %%AIEA_BULLETS_END%%
@@ -101,9 +101,9 @@ Fremont, CA $\cdot$ (510) 468-7997 & \href{https://www.linkedin.com/in/haatim-al
 \ressubheading{Website Developer}{Milpitas, CA}{Golden Harvest Montessori}{June 2022 -- Present}
 \begin{itemize}
 % %%MONTESSORI_BULLETS_START%%
-    \resitem{Founded and led a \textbf{3}-person team to build the school's \textbf{8}-page responsive website from scratch in \textbf{HTML/CSS}, \textbf{Bootstrap}, and \textbf{jQuery}, with downloadable enrollment forms, now driving \textbf{150+} parent enrollments over \textbf{3} years}
-    \resitem{Kept it live by tracing an outage on \textbf{6} of \textbf{8} pages to a legacy CMS stripping script tags, then refactored inline styles into a modular per-page \textbf{CSS} system, cutting \textbf{18+} dead rules with \textbf{zero} visual regressions}
-    \resitem{Set up \textbf{Google Analytics} on every page and verified the site in \textbf{Google Search Console}; it drew \textbf{1,500+} page views a month from \textbf{880+} visitors, with Google search as the top referrer}
+    \resitem{Founded and led a \textbf{3}-person team to build a school website from scratch, now driving \textbf{150+} parent enrollments over \textbf{3} years}
+    \resitem{Kept it live by tracing an outage on \textbf{6} of \textbf{8} pages to a legacy CMS stripping script tags and restoring \textbf{jQuery/Bootstrap}}
+    \resitem{Then refactored inline styles into a modular per-page \textbf{CSS} system, cutting \textbf{18+} dead rules with \textbf{zero} visual regressions}
 % %%MONTESSORI_BULLETS_END%%
 \end{itemize}
 
@@ -124,7 +124,7 @@ Fremont, CA $\cdot$ (510) 468-7997 & \href{https://www.linkedin.com/in/haatim-al
 % %%UPLINK_BULLETS_START%%
     \resitem{Co-built a food-rescue system where donations arrive by \textbf{Claude} photo counting or \textbf{ElevenLabs} voice, then \textbf{3} Claude agents with competing goals (speed, cost, need) propose, vote, and veto each delivery}
     \resitem{Distributed it into \textbf{16} independent agent processes on Cisco's \textbf{AGNTCY A2A protocol over NATS} with an agent directory and heartbeats, matching in-process decisions with \textbf{0} failed messages}
-    \resitem{On \textbf{100} held-out scenarios, cut food lost by \textbf{93\%} vs. a nearest-shelter baseline and \textbf{67\%} vs. the best single agent}
+    \resitem{On \textbf{100} held-out scenarios, cut food lost by \textbf{93\%} vs. a nearest-shelter baseline and \textbf{67\%} vs. the best single agent, with photo counts within 10\% on \textbf{33} of \textbf{34} test reads}
 % %%UPLINK_BULLETS_END%%
 \end{itemize}
 
@@ -132,8 +132,8 @@ Fremont, CA $\cdot$ (510) 468-7997 & \href{https://www.linkedin.com/in/haatim-al
 \begin{itemize}
 % %%PATHWISE_BULLETS_START%%
     \resitem{Built an agent turning plain-English finances into a month-by-month plan, reasoning with \textbf{NVIDIA Nemotron 49B via NIM}}
-    \resitem{Grounded plans in live HYSA, mortgage, and S\&P 500 rates via the \textbf{Tavily} API, with what-if re-planning on demand}
-    \resitem{Shipped a \textbf{Flask + Chart.js} demo of payoff timelines, surplus allocation, and net worth within \textbf{24 hours}}
+    \resitem{Grounded plans in live HYSA, mortgage, and S\&P 500 rates via the \textbf{Tavily} API, with persistent memory and what-if scenarios that re-plan on demand}
+    \resitem{Shipped a \textbf{Flask + Chart.js} full-stack demo of payoff timelines, surplus allocation, and net worth trajectory within \textbf{24 hours}, submitted to the Cloud and Best for UCSC tracks}
 % %%PATHWISE_BULLETS_END%%
 \end{itemize}
 

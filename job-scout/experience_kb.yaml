@@ -79,14 +79,13 @@ experience:
     location: Santa Cruz, CA
     dates: May 2026 - Present
     bullets:
-      - "Eliminated idle GPU-node costs on the shared Nautilus cluster by replacing an always-on GPU Deployment with run-to-completion Kubernetes Jobs that train a PyTorch CNN on CIFAR-10 and save results to a Ceph-backed persistent volume"
+      - "Eliminated idle GPU-node costs by containerizing PyTorch CNN training on CIFAR-10 as GPU-backed Kubernetes Jobs on the Nautilus cluster that save results to persistent volumes and release their GPUs when done"
       - "Replaced one-off experiment scripts with a single-file benchmarking framework that automates training, hyperparameter sweeps, and reward-curve generation for 3+ RL algorithms in parallel"
-      - "Produced head-to-head reward and loss convergence benchmarks for 5 reinforcement learning algorithms (PPO, DQN, SAC, DDPG, SB3 baseline) on the CarRacing-v2 driving task, tracked in TensorBoard"
+      - "Produced head-to-head reward and loss convergence benchmarks for 5 reinforcement learning algorithms (PPO, DQN, SAC, DDPG, SB3 baseline) on CarRacing-v2 in TensorBoard"
     key_metrics:
       - "5 RL algorithms implemented and benchmarked"
       - "3+ RL algorithms benchmarked in parallel via a custom framework"
       - "Idle GPU-node costs eliminated by running training as Kubernetes Jobs"
-      - "Replaced an always-on GPU Deployment (sleep infinity) with run-to-completion Jobs; results on a Ceph-backed (rook-ceph-block) PVC; image pytorch 2.5.1 / CUDA 12.4, 1 GPU"
     narrative: "Direct hands-on research experience with ML training pipelines, GPU infrastructure, and RL -- the strongest evidence of applied AI/ML capability."
 
   - title: Website Developer
@@ -94,14 +93,11 @@ experience:
     location: Milpitas, CA
     dates: June 2022 - Present
     bullets:
-      - "Supported 150+ parent enrollments over 3 years by founding and leading a 3-person team that built the school's 8-page responsive website in HTML/CSS, Bootstrap, and jQuery, with downloadable enrollment and licensing forms"
-      - "Restored 6 of 8 live pages after a production outage by tracing it to a legacy CMS stripping script tags, then removed 18+ dead style rules with zero visual regressions by moving inline styles into modular per-page CSS"
-      - "Drew 1,500+ page views a month from 880+ visitors, with Google search as the top referrer, after setting up Google Analytics on every page and verifying the site in Google Search Console"
+      - "Supported 150+ parent enrollments over 3 years by founding and leading a 3-person team that built the school's website"
+      - "Restored 6 of 8 live pages after a production outage by tracing it to a legacy CMS stripping script tags"
+      - "Removed 18+ dead style rules with zero visual regressions by moving inline styles into a modular per-page CSS system"
     key_metrics:
       - "150+ parent enrollments driven over 3 years"
-      - "8 pages (home, about, preschool, kindergarten, afterschool, summer camp, resources, contact), responsive Bootstrap 4 + jQuery, 10 downloadable enrollment and state licensing forms (repo Haatim-Ali/ghms-website)"
-      - "Google Analytics (gtag) on every page; site verified in Google Search Console"
-      - "1,580 page views and 883 unique visitors in a month (server logs, Mar 15 - Apr 14 2024, bots filtered), Google search the top referrer"
       - "Restored functionality across 6 of 8 production pages after root-causing a CMS outage"
       - "Removed 18+ dead CSS rules with zero regressions"
     narrative: "Longest-running project -- founded and led the team behind a production website, with hands-on ownership of outages and technical debt cleanup, long before the AI/ML focus."
@@ -111,8 +107,8 @@ experience:
     location: Milpitas, CA
     dates: June 2022 - August 2025 (summers)
     bullets:
-      - "Reached a 100% project completion and live-demo rate for 30+ students ages 6–12 per camp by designing a 20+ lesson, 4-week Python curriculum that teaches syntax, control flow, functions, and debugging through projects"
-      - "Delivered 1:1 debugging help across 6+ hours of daily instruction by recruiting, training, and managing 2 volunteer TAs; the school adopted the curriculum as its standard summer CS program for 4 straight years"
+      - "Reached a 100% project completion and live-demo rate for 30+ students ages 6–12 per camp by designing a 20+ lesson, 4-week Python curriculum taught through projects"
+      - "Delivered 1:1 debugging help across 6+ hours of daily instruction by recruiting, training, and managing 2 volunteer TAs"
     key_metrics:
       - "30+ students taught per camp, ages 6-12"
       - "100% project completion and live-demo rate"

@@ -4,13 +4,11 @@
 # Text uses **bold** markers like the tailor prompt (none are bolded today). Keep the result-first
 # style and roughly the length of the defaults (the page is full). Add only verified facts.
 
-MONTESSORI_BULLETS: []
-  # (the traffic bullet is a template default since 2026-11-05: server logs, Mar 15 - Apr 14 2024,
-  # bots filtered: 1,580 page views, 883 unique IPs)
+MONTESSORI_BULLETS:
+  # Server logs, Mar 15 - Apr 14 2024 (bots filtered): 1,580 page views, 883 unique IPs
+  - "Drew 1,500+ page views a month from 880+ visitors, with Google search as the top referrer, tracked in Google Analytics"
 
 UPLINK_BULLETS:
-  # voice.py, commit f515d20 (Haatim's, on main)
-  - "Stopped ElevenLabs voices from dropping lines under the API's concurrency limit by queuing and retrying requests"
   # saraxjain/uplink: 10 of the 13 merged PRs are Haatim's (#1-4, 6-8, 10, 12, 13)
   - "Shipped 10 of the team's 13 merged pull requests, including the A2A agent runtime, the evaluation, photo accuracy, and the customer site"
   # PR #2
@@ -21,7 +19,6 @@ UPLINK_BULLETS:
   - "Hardened the agents' human escalation for red-line vetoes and deadlocks with a safer fallback when no person answers in time"
 
 JOBAGENT_BULLETS:
-  - "Ensured every resume targets the real posting by reading JavaScript-heavy career sites through job APIs and a headless Playwright browser, rejecting non-prose pages"
   - "Kept every tailored resume truthful with an LLM pipeline that rewrites bullets toward each posting, plus code checks and an independent fact-check that reject unsupported claims"
   - "Fit every tailored resume on one page with a layout guard that recompiles it and reverts the largest edits until it fits"
   # jobs.db: seen_jobs, applications, rejections, apply_queue, tailored_resumes, learned_boards
