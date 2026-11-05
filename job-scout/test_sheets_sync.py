@@ -299,3 +299,32 @@ def test_reminder_without_role_is_quiet_when_a_row_already_has_that_status():
     sheet, apps = _email_sheet()
     apps.rows[1][2] = "Assessment"
     assert ss.record_email("NVIDIA", "", "assessment", "9/3/2026", "x", sheet=sheet) == "unchanged"
+
+
+def test_dashboard_counts_applications_per_day_for_the_last_30_days():
+    cells = dict(ss.dashboard_cells())
+    first, last = 11, 10 + ss.DAILY_DAYS
+    assert cells[f"P{first}"] == f"=TODAY()-{ss.DAILY_DAYS - 1}" and cells[f"P{last}"] == "=TODAY()-0"
+    assert cells[f"Q{last}"] == f'=COUNTIFS(\'Applications\'!D2:D,">="&P{last},\'Applications\'!D2:D,"<"&P{last}+1)'
+    assert " today · " in cells["B7"]
+
+
+def test_dashboard_chart_plots_the_hidden_daily_table():
+    from unittest.mock import MagicMock
+    ws = MagicMock(id=7)
+    ws.title = ss.DASHBOARD_TAB
+    sheet = MagicMock()
+    sheet.worksheets.return_value = [ws]
+    sheet.fetch_sheet_metadata.return_value = {"sheets": [{"properties": {"sheetId": 7}}]}
+    ss.layout_dashboard(sheet)
+    ws.resize.assert_called_once_with(cols=ss.DASH_COLS)
+    reqs = sheet.batch_update.call_args[0][0]["requests"]
+    chart = next(r["addChart"]["chart"]["spec"] for r in reqs if "addChart" in r)
+    assert chart["title"].startswith("Applications per day")
+    assert chart["hiddenDimensionStrategy"] == "SHOW_ALL"
+    domain = chart["basicChart"]["domains"][0]["domain"]["sourceRange"]["sources"][0]
+    series = chart["basicChart"]["series"][0]["series"]["sourceRange"]["sources"][0]
+    assert (domain["startColumnIndex"], series["startColumnIndex"]) == (15, 16)
+    assert series["endRowIndex"] - series["startRowIndex"] == ss.DAILY_DAYS
+    hidden = [r for r in reqs if r.get("updateDimensionProperties", {}).get("properties", {}).get("hiddenByUser")]
+    assert hidden and hidden[0]["updateDimensionProperties"]["range"]["startIndex"] == 15

@@ -795,7 +795,7 @@ Settings are read **when a sync runs, not when the module is imported**. That fi
 
 | Tab | What it shows |
 |---|---|
-| **Dashboard** | Totals (applications, companies, in progress, response rate, rejected, offers), a status breakdown with coloured bars, applications per week (table + chart), companies with several roles, and recent activity. Every number is a formula over Applications, so it is always current. |
+| **Dashboard** | Totals (applications, companies, in progress, response rate, rejected, offers), a status breakdown with coloured bars, a table of applications per week, a chart of applications per day for the last 30 days (fed by a hidden per-day table in columns P:Q, so the chart sets `hiddenDimensionStrategy: SHOW_ALL`), companies with several roles, and recent activity. The Applications card also shows today's count. Every number is a formula over the Applied column, so the chart updates the moment a row is added. |
 | **Applications** | One row per position, newest first: A Company, B Role, C Status (dropdown, coloured chip), D Applied, E Updated, F Source, G Location, H Posting (`Open ↗` link), I Resume (`Tailored ↗` link or "Default"), J Notes, K Roles @ Co. |
 | **Quick Apply** | Copy-ready application details (contact, links, address, education, work authorization, common answers, voluntary self-ID), from `application_answers.yaml`. Typed once by hand; the code never touches it, so edit it freely. |
 | **Targets** | Your hand-made list of companies, with formulas for how many roles you have applied to there and the latest status ("Not yet" in grey). |
@@ -1080,6 +1080,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-11-05: daily applications chart.** Haatim wanted to see how many applications he sends each day. The Dashboard chart now shows applications per day for the last 30 days instead of per week (the weekly table stays), and the Applications card reads "N today · M this week". The chart reads hidden columns P:Q on the Dashboard, 30 formulas counting rows in Applications by Applied date, so it updates live as rows arrive. Applied to the live sheet with `layout_dashboard` only.
 
 **2026-11-04: both resume templates tell the same facts.** The two templates had drifted apart: 195 vs. 200+ tests, a Debian vs. Linux VPS, different degree, lab and project names, and camp dates of "June 2022 -- August 2025" vs. "Summers 2022 -- 2025". Both now use the same names and dates, and JobAgent's numbers were refreshed from the live database and logs (58,000+ postings seen, 1,272 unique alerts since 2026-07-26, about 2,500 company boards, 334 tests), also in `experience_kb.yaml`, so the fact-check accepts them. The classic template's JobAgent bullets now start with past-tense verbs like the rest, and it bolds tools consistently (TensorBoard, jQuery/Bootstrap, CSS, Python, Tavily). Each layout keeps its own style; both still compile to one page.
 

@@ -399,13 +399,17 @@ A = f"'{APPS_TAB}'!"
 ACTIVE = f'COUNTIFS({A}C2:C,"<>To Apply",{A}A2:A,"<>")'
 
 
+DAILY_DAYS = 30
+DASH_COLS = 17   # A:N visible, P:Q hold the hidden per-day table
+
+
 def dashboard_cells():
     """(cell, value) pairs for the Dashboard: every number is a formula over Applications."""
     cells = [
         ("B2", "Internship Tracker"),
         ("B3", f'="Updated "&TEXT(MAX({A}E2:E),"mmm d, yyyy")&"  ·  "&COUNTIF({A}C2:C,"To Apply")&" saved to apply later"'),
         # KPI cards: label row 5, number row 6, caption row 7
-        ("B5", "APPLICATIONS"), ("B6", f"={ACTIVE}"), ("B7", f'=COUNTIFS({A}D2:D,">="&TODAY()-6)&" this week"'),
+        ("B5", "APPLICATIONS"), ("B6", f"={ACTIVE}"), ("B7", f'=COUNTIFS({A}D2:D,">="&TODAY(),{A}D2:D,"<"&TODAY()+1)&" today · "&COUNTIFS({A}D2:D,">="&TODAY()-6)&" this week"'),
         ("D5", "COMPANIES"), ("D6", f'=IFERROR(COUNTUNIQUE(FILTER({A}A2:A,{A}A2:A<>"",{A}C2:C<>"To Apply")),0)'),
         ("D7", f'=IFERROR(ROWS(UNIQUE(FILTER({A}A2:A,{A}K2:K>1))),0)&" with several roles"'),
         ("F5", "IN PROGRESS"), ("F6", f'=COUNTIF({A}C2:C,"Applied")+COUNTIF({A}C2:C,"Assessment")+COUNTIF({A}C2:C,"Interviewing")'),
@@ -430,6 +434,12 @@ def dashboard_cells():
         r = 11 + i
         cells += [(f"F{r}", f"=TODAY()-WEEKDAY(TODAY(),3)-7*{9 - i}"),
                   (f"G{r}", f'=COUNTIFS({A}D2:D,">="&F{r},{A}D2:D,"<"&F{r}+7)')]
+    # Applications per day, last DAILY_DAYS days, in hidden columns P:Q that feed the daily chart
+    cells += [("P10", "Day"), ("Q10", "Applied")]
+    for i in range(DAILY_DAYS):
+        r = 11 + i
+        cells += [(f"P{r}", f"=TODAY()-{DAILY_DAYS - 1 - i}"),
+                  (f"Q{r}", f'=COUNTIFS({A}D2:D,">="&P{r},{A}D2:D,"<"&P{r}+1)')]
     # Companies with several roles, and recent activity
     cells += [
         ("B22", "Companies with several roles"), ("C22", "Roles"),
@@ -446,9 +456,10 @@ def dashboard_cells():
 
 
 def layout_dashboard(sheet):
-    ws = _ensure_tab(sheet, DASHBOARD_TAB, 0, rows=60, cols=14)
+    ws = _ensure_tab(sheet, DASHBOARD_TAB, 0, rows=60, cols=DASH_COLS)
+    ws.resize(cols=DASH_COLS)
     sid = ws.id
-    ws.batch_clear(["A1:N60"])
+    ws.batch_clear(["A1:Q60"])
     ws.batch_update([{"range": c, "values": [[v]]} for c, v in dashboard_cells()], value_input_option="USER_ENTERED")
     reqs = _clear_requests(sheet, sid)
     widths = [24, 240, 70, 130, 24, 150, 70, 150, 80, 150, 24, 150, 80, 24]
@@ -505,16 +516,23 @@ def layout_dashboard(sheet):
     reqs.append(_fmt(_grid(sid, 1, 3, 1, 12), {"wrapStrategy": "OVERFLOW_CELL"}, "userEnteredFormat.wrapStrategy"))
     reqs += _status_rules(_grid(sid, 10, 19, 1, 2))
     reqs += _status_rules(_grid(sid, 22, 60, 11, 12))
-    # Weekly chart beside the week table (the status table has its own coloured bars)
+    # Daily chart beside the week table, fed by the hidden per-day table in P:Q
+    last = 10 + DAILY_DAYS
+    reqs.append(_fmt(_grid(sid, 10, last, 15, 16), {"numberFormat": {"type": "DATE", "pattern": "mmm d"}},
+                     "userEnteredFormat.numberFormat"))
+    reqs.append({"updateDimensionProperties": {"range": {"sheetId": sid, "dimension": "COLUMNS", "startIndex": 15, "endIndex": 17},
+                                               "properties": {"hiddenByUser": True}, "fields": "hiddenByUser"}})
     reqs.append({"addChart": {"chart": {"spec": {
-        "title": "Applications per week", "titleTextFormat": _text(INK, bold=True, size=11), "fontName": FONT,
+        "title": f"Applications per day (last {DAILY_DAYS} days)", "titleTextFormat": _text(INK, bold=True, size=11),
+        "fontName": FONT, "hiddenDimensionStrategy": "SHOW_ALL",
         "basicChart": {"chartType": "COLUMN", "legendPosition": "NO_LEGEND",
                        "axis": [{"position": "BOTTOM_AXIS"}, {"position": "LEFT_AXIS"}],
-                       "domains": [{"domain": {"sourceRange": {"sources": [_grid(sid, 10, 20, 5, 6)]}}}],
-                       "series": [{"series": {"sourceRange": {"sources": [_grid(sid, 10, 20, 6, 7)]}},
-                                   "targetAxis": "LEFT_AXIS", "colorStyle": {"rgbColor": _rgb(ACCENT)}}]}},
+                       "domains": [{"domain": {"sourceRange": {"sources": [_grid(sid, 10, last, 15, 16)]}}}],
+                       "series": [{"series": {"sourceRange": {"sources": [_grid(sid, 10, last, 16, 17)]}},
+                                   "targetAxis": "LEFT_AXIS", "colorStyle": {"rgbColor": _rgb(ACCENT)},
+                                   "dataLabel": {"type": "DATA", "placement": "OUTSIDE_END"}}]}},
         "position": {"overlayPosition": {"anchorCell": {"sheetId": sid, "rowIndex": 8, "columnIndex": 7},
-                                         "offsetXPixels": 16, "widthPixels": 540, "heightPixels": 270}}}}})
+                                         "offsetXPixels": 16, "widthPixels": 600, "heightPixels": 270}}}}})
     sheet.batch_update({"requests": reqs})
 
 
