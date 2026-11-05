@@ -276,3 +276,48 @@ class TestGetVaultRejectionContext:
         # Should not raise
         result = scraper.get_vault_rejection_context()
         assert result == ""
+
+
+# ── Location colour on alerts ─────────────────────────────────────────────────
+
+@pytest.mark.parametrize("location, zone", [
+    ("Sunnyvale, CA", "preferred"), ("Los Angeles", "preferred"), ("United States-California-McClellan", "preferred"),
+    ("JPL Campus", "preferred"), ("Berkeley", "preferred"), ("San Diego, CA, USA", "preferred"),
+    ("New York, NY", "preferred"), ("Rochester, New York", "preferred"), ("New York, United States", "preferred"),
+    ("Chicago, IL 60607", "preferred"), ("Niles, IL", "preferred"), ("Deerfield, IL", "preferred"), ("Warrenville, IL, US", "preferred"),
+    ("Austin, TX; San Jose, CA; Chicago, IL; Omaha, NE", "preferred"), ("Menlo Park, CA; Sunnyvale, CA", "preferred"),
+    ("Remote-MO", "remote"), ("Remote", "remote"),
+    ("Seattle, WA", "elsewhere"), ("US-IA-CEDAR RAPIDS-105 ~ 400 Collins Rd NE", "elsewhere"),
+    ("Waltham, US-MA, USA", "elsewhere"), ("Cambridge, MA", "elsewhere"), ("Champaign, IL", "elsewhere"),
+    ("Washington, DC", "elsewhere"), ("Florida - Deerfield Beach", "elsewhere"),
+    ("", "unknown"), (None, "unknown"), ("N/A", "unknown"), ("2 Locations", "unknown"),
+])
+def test_location_zone(location, zone):
+    scraper = _import_scraper()
+    assert scraper.location_zone(location)[0] == zone
+
+
+def test_location_zone_names_every_preferred_place():
+    scraper = _import_scraper()
+    assert scraper.location_zone("Austin, TX; San Jose, CA; Chicago, IL")[1] == "California · Chicago"
+
+
+def test_alert_colour_and_first_line_follow_the_location(monkeypatch):
+    scraper = _import_scraper()
+    sent = []
+
+    class Hook:
+        def __init__(self, url, content):
+            self.content, self.embeds = content, []
+        def add_embed(self, e):
+            self.embeds.append(e)
+        def execute(self):
+            sent.append(self)
+
+    monkeypatch.setattr(scraper, "DiscordWebhook", Hook)
+    scraper.send_discord_alert({"title": "SWE Intern", "company": "Acme", "location": "Seattle, WA",
+                                "job_url": "https://x"}, {"fit_score": 7})
+    embed = sent[0].embeds[0]
+    assert sent[0].content.startswith("🟠")
+    assert embed.color == int("E67E22", 16)
+    assert embed.description.startswith("📍 Outside CA · Chicago · NY")

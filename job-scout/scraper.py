@@ -488,6 +488,39 @@ Description (first 3500 chars): {str(job.get("description") or "")[:3500]}"""
         return _score_failure(e)
 
 
+# Where Haatim most wants to work: alerts there are green, the rest blue (remote), orange (elsewhere in
+# the US) or grey (no location given). Chicago suburbs count only with IL in the location (not Deerfield Beach, FL). Alerts still all go to #job-alerts so 👍 tailoring works on every one.
+_CA = re.compile(r"\bCA\b|-CA-|\bcalifornia\b|\b(?:san francisco|bay area|los angeles|san jose|san diego|"
+                 r"berkeley|oakland|palo alto|mountain view|sunnyvale|santa clara|cupertino|menlo park|"
+                 r"redwood city|san mateo|irvine|pasadena|santa monica|silicon valley|jpl)\b", re.I)
+_NY = re.compile(r"\bNY\b|-NY-|\bnew york\b|\bnyc\b|\b(?:manhattan|brooklyn)\b", re.I)
+_CHI = re.compile(r"\bchicago\b|\b(?:evanston|naperville|schaumburg|oak brook|deerfield|northbrook|skokie|"
+                  r"rosemont|itasca|lisle|downers grove|lombard|elk grove village|arlington heights|des plaines|"
+                  r"lake forest|lincolnshire|hoffman estates|oak park|glenview|riverwoods|vernon hills|"
+                  r"abbott park|niles|warrenville|wheeling|bannockburn|mettawa)\b.*(?:\bIL\b|-IL-|\billinois\b)", re.I)
+_REMOTE = re.compile(r"\bremote\b", re.I)
+ZONES = {   # zone: (embed colour, emoji)
+    "preferred": ("2ECC71", "🟢"),
+    "remote": ("3498DB", "🔵"),
+    "elsewhere": ("E67E22", "🟠"),
+    "unknown": ("95A5A6", "⚪"),
+}
+
+
+def location_zone(location):
+    """("preferred" | "remote" | "elsewhere" | "unknown", label) for an alert's location. A posting listing
+    several places counts as preferred if any of them is in California, the Chicago area or New York."""
+    loc = str(location or "").strip()
+    places = [name for name, rx in (("California", _CA), ("Chicago", _CHI), ("New York", _NY)) if rx.search(loc)]
+    if places:
+        return "preferred", " · ".join(places)
+    if _REMOTE.search(loc):
+        return "remote", "Remote"
+    if not loc or loc.upper() in ("N/A", "NONE", "UNKNOWN") or re.fullmatch(r"\d+ locations?", loc, re.I):
+        return "unknown", "Location not listed, check the posting"
+    return "elsewhere", "Outside CA · Chicago · NY"
+
+
 def age_hours(job):
     """Hours since the job was posted, or None if unknown."""
     dp = job.get("date_posted")
@@ -537,14 +570,11 @@ def send_discord_alert(job, analysis, is_repost=False):
 
     is_hot = not is_repost and hours is not None and hours <= 1
 
-    if is_watchlist:
-        color = "FFD700"
-    elif is_hot:
-        color = "00FF7F"
-    else:
-        color = "03b2f8"
+    # Colour shows where the job is; fresh and watchlist stay as flags in the text
+    zone, zone_label = location_zone(job.get("location"))
+    color, zone_emoji = ZONES[zone]
 
-    flags = []
+    flags = [f"📍 {zone_label}"]
     if is_repost:
         flags.append("♻️ REPOST -- timestamp unreliable, likely stale")
     elif is_hot:
@@ -570,11 +600,11 @@ def send_discord_alert(job, analysis, is_repost=False):
     fit_score = analysis.get("fit_score", "?")
     description_preview = str(job.get("description") or "")[:300] + "..."
 
-    embed_description = ("\n".join(flags) + "\n\n" if flags else "") + description_preview
+    embed_description = "\n".join(flags) + "\n\n" + description_preview
 
     webhook = DiscordWebhook(
         url=WEBHOOK_URL,
-        content=f"{mention} New job match! Fit score: {fit_score}/10"
+        content=f"{zone_emoji} {mention} New job match! Fit score: {fit_score}/10"
     )
 
     embed = DiscordEmbed(

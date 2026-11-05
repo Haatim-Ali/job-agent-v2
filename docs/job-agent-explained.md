@@ -321,7 +321,7 @@ This is the same shape a JobSpy row has, so everything downstream (`process_jobs
 - **Apple** (2026-11-04) has no JSON API, but each `jobs.apple.com` search page carries its results as a JSON string in `window.__staticRouterHydrationData`. `fetch_apple` reads the Internships team filter for US locations, newest first, 20 per page, and stops at the first page that reaches past the age window. The summary on the search page is the description. Apple lists one posting once per location, so the same link can appear twice; `fetch_all` keeps the first.
 - Not readable: iCIMS and Jobvite (HTML pages, no public JSON), the `*.eightfold.ai` hosts (time out), and custom sites (Google, Meta, Microsoft, Tesla, TikTok, AMD, EA). Those still arrive through LinkedIn and the Simplify list itself.
 
-**Watched companies.** `watch_internships` in `scraper_config.json` (currently `["sephora"]`) lists companies where **every** internship is alerted, whatever the role: `is_watched_internship` keeps any posting from that company with a whole-word "intern"/"internship" in the title, past the role-keyword filter, and the scraper alerts it even if Claude's fit score is low (the score is still shown). These alerts carry a 👀 flag and, as watchlist companies, a gold color.
+**Watched companies.** `watch_internships` in `scraper_config.json` (currently `["sephora"]`) lists companies where **every** internship is alerted, whatever the role: `is_watched_internship` keeps any posting from that company with a whole-word "intern"/"internship" in the title, past the role-keyword filter, and the scraper alerts it even if Claude's fit score is low (the score is still shown). These alerts carry a 👀 flag and the ⭐ watchlist flag.
 
 **Learned boards.** When a job is alerted from a company's board (found through Simplify, a career site, or the LinkedIn lookup), that board is saved in the `learned_boards` table, and every later run checks it directly alongside `scraper_config.json`. The config file itself is never edited by code, so a deploy or rollback can't clobber it. The first board learned was Pinterest's.
 
@@ -463,7 +463,7 @@ At the end of a run with an account problem, the packet step is skipped too, sin
 Alerts are sent through a Discord **webhook**: a secret URL that accepts a message and posts it into one channel, no bot login needed. The message is an **embed** (Discord's card format) with:
 
 - **Title** "Role @ Company," linked to the posting (the bot later reads this link and title back out of the embed).
-- **Color:** gold for a watchlist company (Anthropic, OpenAI, NVIDIA, Databricks, Scale AI, Cohere, Mistral, Groq, Together AI, Perplexity, Cursor), spring green if under an hour old, otherwise blue.
+- **Color = location** (since 2026-11-05, `location_zone`): 🟢 green for California, the Chicago area or New York State; 🔵 blue for remote; 🟠 orange anywhere else in the US; ⚪ grey when the posting gives no location (blank or "2 Locations"). The same emoji starts the ping message, so it shows in phone notifications, and the first line of the card says where ("📍 California · Chicago" or "📍 Outside CA · Chicago · NY"). A posting listing several places is green if any of them is preferred. Chicago suburbs (Niles, Warrenville, Naperville and others) count only when the location also says IL, so Deerfield Beach, FL stays orange. Everything still goes to #job-alerts so 👍 tailoring works on every alert. Fresh postings (🔥) and watchlist companies (⭐: Anthropic, OpenAI, NVIDIA, Databricks, Scale AI, Cohere, Mistral, Groq, Together AI, Perplexity, Cursor) are flags in the card text; before this they set the color (gold, spring green, otherwise blue).
 - **Flags:** ♻️ REPOST, 🔥 FRESH, ⭐ WATCHLIST COMPANY, 🏢 FROM COMPANY CAREER SITE, 👀 applicant count.
 - **Fields:** company, location, posted, applicants, source, and Claude's one-sentence "Why it fits."
 - **Footer:** the reaction legend (👍 tailor, ✅ applied, ❌ dismiss).
@@ -1080,6 +1080,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-11-05: alerts color-coded by location.** Haatim wanted to see at a glance which jobs are outside California, Chicago and New York. Alert color and the ping's first emoji now show the location: green (California, Chicago area, New York State), blue (remote), orange (elsewhere in the US), grey (no location given), with a 📍 line at the top of each card. Checked against the last 100 real alerts: 43 green, 53 orange, 4 grey. Alerts stay in one channel so 👍 tailoring keeps working.
 
 **2026-11-05: daily applications chart.** Haatim wanted to see how many applications he sends each day. The Dashboard chart now shows applications per day for the last 30 days instead of per week (the weekly table stays), and the Applications card reads "N today · M this week". The chart reads hidden columns P:Q on the Dashboard, 30 formulas counting rows in Applications by Applied date, so it updates live as rows arrive. Applied to the live sheet with `layout_dashboard` only.
 
