@@ -91,25 +91,25 @@ Fremont, CA $\cdot$ (510) 468-7997 $\cdot$ htali@ucsc.edu $\cdot$ \href{https://
 \ressubheading{Undergraduate Research Assistant --- Autonomous Vehicles}{Santa Cruz, CA}{AI Explainability and Accountability (AIEA) Lab}{May 2026 -- Present}
 \begin{itemize}
 % %%AIEA_BULLETS_START%%
-    \resitem{Eliminated idle GPU-node costs by containerizing PyTorch CNN training on CIFAR-10 as GPU-backed Kubernetes Jobs on the Nautilus cluster that save results to persistent volumes and release their GPUs when done}
+    \resitem{Eliminated idle GPU-node costs on the shared Nautilus cluster by replacing an always-on GPU Deployment with run-to-completion Kubernetes Jobs that train a PyTorch CNN on CIFAR-10 and save results to a Ceph-backed persistent volume}
     \resitem{Replaced one-off experiment scripts with a single-file benchmarking framework that automates training, hyperparameter sweeps, and reward-curve generation for 3+ RL algorithms in parallel}
-    \resitem{Produced head-to-head reward and loss convergence benchmarks for 5 reinforcement learning algorithms (PPO, DQN, SAC, DDPG, SB3 baseline) on CarRacing-v2 in TensorBoard}
+    \resitem{Produced head-to-head reward and loss convergence benchmarks for 5 reinforcement learning algorithms (PPO, DQN, SAC, DDPG, SB3 baseline) on the CarRacing-v2 driving task, tracked in TensorBoard}
 % %%AIEA_BULLETS_END%%
 \end{itemize}
 
 \ressubheading{Website Developer}{Milpitas, CA}{Golden Harvest Montessori}{June 2022 -- Present}
 \begin{itemize}
 % %%MONTESSORI_BULLETS_START%%
-    \resitem{Supported 150+ parent enrollments over 3 years by founding and leading a 3-person team that built the school's website}
-    \resitem{Restored 6 of 8 live pages after a production outage by tracing it to a legacy CMS stripping script tags}
-    \resitem{Removed 18+ dead style rules with zero visual regressions by moving inline styles into a modular per-page CSS system}
+    \resitem{Supported 150+ parent enrollments over 3 years by founding and leading a 3-person team that built the school's 8-page responsive website in HTML/CSS, Bootstrap, and jQuery, with downloadable enrollment and licensing forms}
+    \resitem{Restored 6 of 8 live pages after a production outage by tracing it to a legacy CMS stripping script tags, then removed 18+ dead style rules with zero visual regressions by moving inline styles into modular per-page CSS}
+    \resitem{Drew 1,500+ page views a month from 880+ visitors, with Google search as the top referrer, after setting up Google Analytics on every page and verifying the site in Google Search Console}
 % %%MONTESSORI_BULLETS_END%%
 \end{itemize}
 
 \ressubheading{Python Programming Camp Instructor}{Milpitas, CA}{Golden Harvest Montessori}{Summers 2022 -- 2025}
 \begin{itemize}
-    \resitem{Reached a 100\% project completion and live-demo rate for 30+ students ages 6--12 per camp by designing a 20+ lesson, 4-week Python curriculum taught through projects}
-    \resitem{Delivered 1:1 debugging help across 6+ hours of daily instruction by recruiting, training, and managing 2 volunteer TAs}
+    \resitem{Reached a 100\% project completion and live-demo rate for 30+ students ages 6--12 per camp by designing a 20+ lesson, 4-week Python curriculum that teaches syntax, control flow, functions, and debugging through projects}
+    \resitem{Delivered 1:1 debugging help across 6+ hours of daily instruction by recruiting, training, and managing 2 volunteer TAs; the school adopted the curriculum as its standard summer CS program for 4 straight years}
 \end{itemize}
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -123,7 +123,6 @@ Fremont, CA $\cdot$ (510) 468-7997 $\cdot$ htali@ucsc.edu $\cdot$ \href{https://
     \resitem{Screened 58,000+ postings down to 1,200+ Claude Haiku-scored alerts with a 24/7 Python pipeline on a Linux VPS that runs every 30 min across LinkedIn and 2,500+ company job boards}
     \resitem{Produced a tailored LaTeX resume and cover letter for every alert using Claude Sonnet structured outputs, with an independent fact-check that blocks any unsupported skill, metric, or claim}
     \resitem{Kept the system dependable with 330+ automated tests, GitHub Actions CI, and a deploy script that auto-rolls back on failure, plus a Discord bot that feeds rejection reasons back into scoring}
-    \resitem{Ensured every resume targets the real posting by reading JavaScript-heavy career sites through job APIs and a headless Playwright browser, rejecting non-prose pages}
 % %%JOBAGENT_BULLETS_END%%
 \end{itemize}
 
@@ -133,7 +132,6 @@ Fremont, CA $\cdot$ (510) 468-7997 $\cdot$ htali@ucsc.edu $\cdot$ \href{https://
     \resitem{Cut food lost by 67\% vs. the best single agent and 93\% vs. a nearest-shelter baseline on 100 held-out scenarios by co-building 3 negotiating Claude agents (speed, cost, need) and the evaluation harness}
     \resitem{Scaled the agents to 16 independent processes with 0 failed messages by re-architecting them onto Cisco's AGNTCY A2A protocol over NATS with an agent directory and heartbeats}
     \resitem{Brought Claude photo counts of donations to within 10\% on 33 of 34 test reads by re-reading only low-confidence photos}
-    \resitem{Stopped ElevenLabs voices from dropping lines under the API's concurrency limit by queuing and retrying requests}
 % %%UPLINK_BULLETS_END%%
 \end{itemize}
 
