@@ -26,7 +26,7 @@ import yaml
 SECTIONS = ["AIEA_BULLETS", "MONTESSORI_BULLETS", "UPLINK_BULLETS", "PATHWISE_BULLETS", "JOBAGENT_BULLETS"]
 SECTION_LABELS = {
     "AIEA_BULLETS": "Undergraduate Research Assistant, Autonomous Vehicles (AIEA Lab)",
-    "MONTESSORI_BULLETS": "Website Developer (Golden Harvest Montessori)",
+    "MONTESSORI_BULLETS": "Lead Software Developer (Golden Harvest Montessori website)",
     "UPLINK_BULLETS": "Project: Uplink, Multi-Agent Food Rescue Negotiation (hackathon, team of 3)",
     "PATHWISE_BULLETS": "Project: Pathwise, Autonomous Financial Planning Agent (hackathon)",
     "JOBAGENT_BULLETS": "Project: JobAgent, Autonomous Internship Search & Resume Tailoring Pipeline",

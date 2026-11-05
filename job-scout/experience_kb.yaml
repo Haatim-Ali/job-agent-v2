@@ -89,7 +89,7 @@ experience:
       - "Replaced an always-on GPU Deployment (sleep infinity) with run-to-completion Jobs; results on a Ceph-backed (rook-ceph-block) PVC; image pytorch 2.5.1 / CUDA 12.4, 1 GPU"
     narrative: "Direct hands-on research experience with ML training pipelines, GPU infrastructure, and RL -- the strongest evidence of applied AI/ML capability."
 
-  - title: Website Developer
+  - title: Lead Software Developer (built and runs the school website)
     company: Golden Harvest Montessori
     location: Milpitas, CA
     dates: June 2022 - Present
