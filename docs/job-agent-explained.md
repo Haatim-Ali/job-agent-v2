@@ -250,6 +250,7 @@ A cron job that silently stops is the worst kind of failure: no errors, just no 
 | `DISCORD_CHANNEL_ID` | #job-alerts |
 | `REQUESTS_CHANNEL_ID` | #requests |
 | `APPLICATIONS_CHANNEL_ID` | #applications |
+| `CONCERNS_CHANNEL_ID` | #concerns, where 💀 opens a thread per posting (since 2026-11-11) |
 | `DISCORD_USER_ID` | Your Discord account, for `<@you>` pings; also the only account whose reactions and messages the bot acts on |
 | `SHARED_WEBHOOK_URL` | Secret URL that posts into the friend's read-only channel (unset = that channel is off) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | Path to the Google service-account key file (`~/.config/job-agent/google-sa.json`, permissions 600) |
@@ -466,7 +467,7 @@ Alerts are sent through a Discord **webhook**: a secret URL that accepts a messa
 - **Color = location** (since 2026-11-05, `location_zone`): 🟢 green for California, the Chicago area or New York State; 🔵 blue for remote; 🟠 orange anywhere else in the US; ⚪ grey when the posting gives no location (blank or "2 Locations"). The same emoji starts the ping message, so it shows in phone notifications, and the first line of the card says where ("📍 California · Chicago" or "📍 Outside CA · Chicago · NY"). A posting listing several places is green if any of them is preferred. Chicago suburbs (Niles, Warrenville, Naperville and others) count only when the location also says IL, so Deerfield Beach, FL stays orange. Everything still goes to #job-alerts so 👍 tailoring works on every alert. Fresh postings (🔥) and watchlist companies (⭐: Anthropic, OpenAI, NVIDIA, Databricks, Scale AI, Cohere, Mistral, Groq, Together AI, Perplexity, Cursor) are flags in the card text; before this they set the color (gold, spring green, otherwise blue).
 - **Flags:** ♻️ REPOST, 🔥 FRESH, ⭐ WATCHLIST COMPANY, 🏢 FROM COMPANY CAREER SITE, 👀 applicant count.
 - **Fields:** company, location, posted, applicants, source, and Claude's one-sentence "Why it fits."
-- **Footer:** the reaction legend (👍 tailor, ✅ applied, ❌ dismiss).
+- **Footer:** the reaction legend (👍 tailor, ✅ applied, ❌ dismiss, 💀 concern).
 - A `<@your-id>` **mention** in the message text so your phone gets a notification.
 
 Then the job is marked seen. If it came from Greenhouse, Lever or Ashby it's added to `apply_queue` (Part 6). If it came from LinkedIn, the scraper first looks for the same role on the company's own board and queues that posting if it finds one.
@@ -499,7 +500,7 @@ The bot is built with **discord.py**, which is **asynchronous**: it runs an **ev
 
 - **`on_ready`**: logged in; writes "Bot online" to the log.
 - **`on_raw_reaction_add`**: a reaction was added anywhere. The "raw" version fires even for messages the bot hasn't cached (for example alerts posted before its last restart), which is why it's used instead of `on_reaction_add`. It ignores the bot's own reactions, anyone other than you (`DISCORD_USER_ID`, since 2026-10-30), and any channel other than #job-alerts, #requests and the actions channel.
-- **`on_message`**: any new message; used for commands (`!...`), dismissal reasons, and #requests conversations.
+- **`on_message`**: any new message; used for commands (`!...`), dismissal reasons, #requests conversations, and notes typed in #concerns threads (`is_concern_thread`: a thread whose parent is `CONCERNS_CHANNEL_ID`; threads made by hand there are ignored).
 
 **Emoji normalization.** 👍🏽 is actually two Unicode characters: 👍 plus a **skin-tone modifier** (U+1F3FB to U+1F3FF). Some keyboards also add an invisible **variation selector** (U+FE0F). `normalize_emoji` strips both, so every variant counts as 👍.
 
@@ -510,6 +511,7 @@ The bot is built with **discord.py**, which is **asynchronous**: it runs an **ev
 | 👍 | Replies "On it!", then runs `tailor.py <job_url> <channel_id> --role <role> --company <company>` as a **subprocess** (a separate program) with a 180-second timeout. `tailor.py` posts the resume and cover letter back itself, named `Haatim_Ali_<Company>_Resume.pdf` and `Haatim_Ali_<Company>_Cover_Letter.pdf`, and records which resume went with the job. Role and company come from the alert card's "Role @ Company" title (`split_alert_title`), so they're right even when the scraped page leaves them out (since 2026-11-03). |
 | ✅ (or the older 📨) | Reads the job URL and "Role @ Company" from the embed, writes a row to `applications`, looks up the resume used (`apply_prep.resume_used`), and writes the Google Sheet row. Replies with what changed in the sheet. |
 | ❌ | Asks "Why are you passing?" and remembers that it's waiting for your answer. Your next message is saved to `rejections` as the reason ("skip" saves none). |
+| 💀 | Raises a concern about that posting or the bot (since 2026-11-11). Works on an alert or a 📎 tailored-files message. The bot posts a card in #concerns ("💀 Role at Company", linking back to the message and the posting) and opens a **thread** on it, named after the posting, asking what's wrong. Everything you type in the thread is saved to `concern_notes` (attachments as their links) and gets a 📝 reaction; `!resolve <note>` marks it resolved and archives the thread, and typing there again reopens it. A second 💀 on the same posting while its thread is open points you back to that thread. One thread per posting means several concerns can be open at once, unlike ❌'s single in-memory pending answer, and they survive restarts because they're in the database. No Claude call is made. Without `CONCERNS_CHANNEL_ID` the bot says so in the actions channel. |
 
 **Why tailoring runs in a subprocess, through `run_in_executor`.** `subprocess.run` **blocks**: the calling thread waits until the program finishes. If the event loop itself waited 60 seconds, the bot would ignore every other event that minute. `loop.run_in_executor(None, ...)` hands the blocking call to a background **thread pool**, and the event loop keeps serving events while it runs. Running tailoring as a separate process also means a crash inside it can't take the bot down.
 
@@ -531,6 +533,7 @@ Pending state lives in two Python dictionaries in memory, `pending_requests` and
 | `!note <url> <text>` | Attach a note |
 | `!tracker` | Your pipeline, newest first, split into 1,900-character chunks (Discord's limit is 2,000 per message) |
 | `!stats` | Counts by status, total dismissals, top 5 dismissal reasons |
+| `!concerns` | Open 💀 concerns, each a link to its thread with its note count |
 | `!help` | The command list |
 
 # Part 6: Documents and applications
@@ -767,6 +770,8 @@ If `APPLICATIONS_CHANNEL_ID` isn't set, notices fall back to the #job-alerts web
 | `rejections` | 0 | bot | id (auto-increment), job_url, title, company, reason, date_rejected | Feeds the scoring prompt |
 | `apply_queue` | 1 | scraper, `apply_prep.py` | `job_url` (key), title, company, ats, board, fit_score, status, packet_dir, note, date_added, date_updated | Application packets |
 | `tailored_resumes` | 0 | `tailor.py`, `apply_prep.py` | `job_url` (key), filename, message_url, date_added | Which resume went with which job |
+| `concern_threads` | new | bot (`concerns.py`) | `thread_id` (key), job_url, title, company, source_link, status (open/resolved), resolution, opened, closed | One 💀 concern per posting |
+| `concern_notes` | new | bot (`concerns.py`) | id, thread_id, text, created | What you typed in each concern thread |
 
 Dates are stored as ISO 8601 text in UTC (`2026-09-30T19:42:03+00:00`), which sorts correctly as plain text.
 
@@ -775,6 +780,8 @@ Dates are stored as ISO 8601 text in UTC (`2026-09-30T19:42:03+00:00`), which so
 When you dismiss a job with ❌ and give a reason, it goes into `rejections`. On every scoring call, your 15 most recent reasons are pasted into Claude's prompt under "You've recently passed on these roles and here's why (use this to calibrate)." Claude then scores similar jobs lower.
 
 No model is retrained. The system adapts by changing **what goes into the prompt**, a technique called **in-context learning**. It's free, it takes effect on the next run, and you can read exactly why a decision changed. There's also an optional second source (`MEMORY_REPO_PATH`, a git repository with `rejection-patterns.md` that the bot appends to and pushes); it isn't configured on this server. With 0 dismissals so far, the loop hasn't had anything to learn from yet.
+
+**💀 concerns are the other loop, for problems scoring can't fix** (a wrong location, a bad tailored resume, a missed filter, an idea). They're not fed to any prompt. They wait in `concern_threads`/`concern_notes` until a Claude Code session reviews them: `ssh jobagent-vps 'cd ~/job-agent/job-scout && venv/bin/python concerns.py'` prints every open concern with its notes and posting link. Each fix is committed and deployed as usual, then closed with `!resolve <what changed>` in its thread.
 
 ## Why data lives in two places
 
@@ -1080,6 +1087,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-11-11: 💀 concerns.** Reacting 💀 to an alert (or a tailored-files message) opens a thread in a new #concerns channel (`CONCERNS_CHANNEL_ID`) where Haatim types a problem or improvement for that posting or the bot. Notes are stored in two new tables via `concerns.py`; `!resolve <note>` closes a thread, `!concerns` lists open ones, and `python concerns.py` prints them for a fix session. No API cost. The alert footer lists 💀. Tests: `test_concerns.py` (store) and `test_bot_concerns.py` (thread handling, needs discord.py).
 
 **2026-11-11: Uplink award on the resume.** Uplink won Best Use of ElevenLabs at the UCSC AI Hackathon 2026. Both templates now show "Won Best Use of ElevenLabs" on the Uplink title line (the italic context line had no room and pushed the date past the margin); both still compile to one page. `experience_kb.yaml` has the award in Uplink's context and key metrics so cover letters may mention it and the fact-check accepts it. 1 test added.
 

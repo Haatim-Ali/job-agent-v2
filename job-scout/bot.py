@@ -18,6 +18,7 @@ import discord
 import sheets_sync
 import apply_prep
 import heartbeat
+import concerns
 
 try:
     from pypdf import PdfReader
@@ -35,6 +36,8 @@ REQUESTS_CHANNEL_ID = int(os.getenv("REQUESTS_CHANNEL_ID", "0"))
 # which can be renamed in Discord (e.g. to #reactions) without changing its ID.
 ACTIONS_CHANNEL_ID = int(os.getenv("ACTIONS_CHANNEL_ID") or os.getenv("APPLICATIONS_CHANNEL_ID") or "0")
 DISCORD_USER_ID = int(os.getenv("DISCORD_USER_ID", "0"))
+# 💀 on an alert opens a thread here to type a concern about that posting or the bot.
+CONCERNS_CHANNEL_ID = int(os.getenv("CONCERNS_CHANNEL_ID", "0"))
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 VENV_PYTHON = os.path.join(SCRIPT_DIR, "venv", "bin", "python")
 DB_PATH = os.path.join(SCRIPT_DIR, "jobs.db")
@@ -45,6 +48,7 @@ TAILOR_EMOJI = "👍"
 APPLIED_EMOJI = "✅"
 APPLIED_EMOJI_ALIASES = {APPLIED_EMOJI, "📨"}
 DISMISS_EMOJI = "❌"
+CONCERN_EMOJI = "💀"
 
 
 def reply_channel_id(source_channel_id):
@@ -66,6 +70,11 @@ def split_alert_title(title):
     if not sep or not role.strip() or not company.strip() or company.strip() == "Unknown":
         return None, None
     return role.strip(), company.strip()
+
+
+def is_concern_thread(channel):
+    """A thread under #concerns (where 💀 opens one per posting)."""
+    return bool(CONCERNS_CHANNEL_ID) and getattr(channel, "parent_id", None) == CONCERNS_CHANNEL_ID
 
 
 def bot_channels():
@@ -98,12 +107,14 @@ HELP_TEXT = """**Job Scout Commands:**
 `!tracker` — show your full application pipeline
 `!stats` — show application stats + rejection patterns
 `!note <job_url> <note>` — add a note to an application
+`!concerns` — list open 💀 concerns
 `!help` — show this message
 
 **Reactions on job alerts** (#job-alerts stays alerts-only; the bot answers every reaction in #reactions):
 👍 — generate tailored resume + cover letter
 ✅ — mark as applied
 ❌ — dismiss (bot asks why in #reactions, helps it learn your preferences)
+💀 — raise a concern (opens a thread in #concerns: type the problem or idea there, `!resolve <note>` closes it)
 
 **#requests channel:**
 Post a job URL or PDF and the bot will ask what you want.
@@ -446,6 +457,31 @@ async def on_raw_reaction_add(payload):
         }
         logging.info(f"Rejection pending for: {title} @ {company}")
 
+    # ── Concern ────────────────────────────────────────────────────────────
+    elif emoji == CONCERN_EMOJI:
+        job_url, title, company = _extract_job_info(message, payload.channel_id)
+        title, company = title.strip(), company.strip()
+        if not CONCERNS_CHANNEL_ID:
+            await channel.send(f"<@{payload.user_id}> 💀 needs a #concerns channel: set CONCERNS_CHANNEL_ID in .env.")
+            return
+        existing = concerns.open_thread_for(job_url)
+        if existing:
+            try:
+                thread = client.get_channel(existing) or await client.fetch_channel(existing)
+                await thread.send(f"<@{payload.user_id}> This posting already has an open concern; add to it here.")
+                return
+            except discord.NotFound:
+                concerns.resolve(existing, "thread deleted")
+        board = client.get_channel(CONCERNS_CHANNEL_ID) or await client.fetch_channel(CONCERNS_CHANNEL_ID)
+        card = await board.send(f"💀 **{title}** at **{company}** ([{source_name}]({message.jump_url}))"
+                                + (f"\n<{job_url}>" if job_url else ""))
+        thread = await card.create_thread(name=concerns.thread_name(title, company), auto_archive_duration=10080)
+        concerns.open_thread(thread.id, job_url, title, company, message.jump_url)
+        await thread.send(f"<@{payload.user_id}> What's the concern? A problem with the posting, the alert, the "
+                          f"tailoring, or an idea to improve the bot. Type as much as you want here; "
+                          f"`!resolve <note>` closes it.")
+        logging.info(f"Concern opened: {title} @ {company} (thread {thread.id})")
+
 
 async def _extract_pdf_text(attachment) -> str | None:
     """Download a PDF attachment and extract its text."""
@@ -497,9 +533,31 @@ async def _run_tailor(channel, user_id, job_url, custom_prompt, jd_file=None):
             os.unlink(jd_file)
 
 
+async def _handle_concern_message(message):
+    """Store what's typed in a #concerns thread; `!resolve <note>` closes it."""
+    thread = message.channel
+    content = message.content.strip()
+    if not concerns.is_tracked(thread.id):
+        return          # a thread made by hand, not by 💀
+    if content.lower().startswith("!resolve"):
+        note = content[len("!resolve"):].strip()
+        concerns.resolve(thread.id, note)
+        await thread.send("✅ Resolved" + (f": {note}" if note else "") + ". Type here again to reopen it.")
+        await thread.edit(archived=True)
+        return
+    text = "\n".join([content] + [a.url for a in message.attachments]).strip()
+    if text:
+        concerns.add_note(thread.id, text)
+        await message.add_reaction("📝")
+
+
 @client.event
 async def on_message(message):
     if message.author == client.user:
+        return
+    if is_concern_thread(message.channel):
+        if is_owner(message.author.id):
+            await _handle_concern_message(message)
         return
     if message.channel.id not in bot_channels() or not is_owner(message.author.id):
         return
@@ -688,6 +746,13 @@ async def on_message(message):
                 line += f"\n   > {notes}"
             lines.append(line)
         msg = "\n".join(lines)
+        for chunk in [msg[i:i+1900] for i in range(0, len(msg), 1900)]:
+            await message.channel.send(chunk)
+
+    elif cmd == "!concerns":
+        items = concerns.open_concerns()
+        msg = "\n".join([f"**{len(items)} open concern{'' if len(items) == 1 else 's'}:**"]
+                         + concerns.summary_lines(items)) if items else "No open concerns."
         for chunk in [msg[i:i+1900] for i in range(0, len(msg), 1900)]:
             await message.channel.send(chunk)
 
