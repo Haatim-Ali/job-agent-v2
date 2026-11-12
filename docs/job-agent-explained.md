@@ -1081,6 +1081,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 
 # Changelog
 
+**2026-11-11: Uplink award on the resume.** Uplink won Best Use of ElevenLabs at the UCSC AI Hackathon 2026. Both templates now show "Won Best Use of ElevenLabs" on the Uplink title line (the italic context line had no room and pushed the date past the margin); both still compile to one page. `experience_kb.yaml` has the award in Uplink's context and key metrics so cover letters may mention it and the fact-check accepts it. 1 test added.
+
 **2026-11-05: alerts color-coded by location.** Haatim wanted to see at a glance which jobs are outside California, Chicago and New York. Alert color and the ping's first emoji now show the location: green (California, Chicago area, New York State), blue (remote), orange (elsewhere in the US), grey (no location given), with a 📍 line at the top of each card. Checked against the last 100 real alerts: 43 green, 53 orange, 4 grey. Alerts stay in one channel so 👍 tailoring keeps working.
 
 **2026-11-05: daily applications chart.** Haatim wanted to see how many applications he sends each day. The Dashboard chart now shows applications per day for the last 30 days instead of per week (the weekly table stays), and the Applications card reads "N today · M this week". The chart reads hidden columns P:Q on the Dashboard, 30 formulas counting rows in Applications by Applied date, so it updates live as rows arrive. Applied to the live sheet with `layout_dashboard` only.

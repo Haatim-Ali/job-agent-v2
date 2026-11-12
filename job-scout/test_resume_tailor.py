@@ -418,3 +418,8 @@ class TestBoldNumbers:
     def test_render_bolds_bullets(self):
         out = rt.render(TEMPLATE, {"UPLINK_BULLETS": [r"Scaled to 16 processes"]})
         assert r"\resitem{Scaled to \textbf{16} processes}" in out
+
+
+def test_both_templates_show_the_uplink_elevenlabs_award():
+    for tex in (TEMPLATE, CLASSIC):
+        assert "{Uplink --- Multi-Agent Food Rescue Negotiation $\\cdot$ Won Best Use of ElevenLabs}" in tex

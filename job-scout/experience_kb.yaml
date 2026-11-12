@@ -121,7 +121,7 @@ experience:
 
 projects:
   - name: Uplink -- Multi-Agent Food Rescue Negotiation
-    context: "UCSC AI Hackathon 2026, Cisco \"When AI Agents Disagree\" track (team of 3)"
+    context: "UCSC AI Hackathon 2026, won Best Use of ElevenLabs, Cisco \"When AI Agents Disagree\" track (team of 3)"
     dates: October 2026
     link: github.com/Haatim-Ali/uplink  # Haatim's fork of the team repo (saraxjain/uplink)
     bullets:
@@ -133,6 +133,7 @@ projects:
       - "93% less food lost than a nearest-shelter baseline, 67% less than the best single agent (100 held-out scenarios)"
       - "16 agent processes over A2A/NATS with 0 failed messages"
       - "Photo counts within 10% on 33 of 34 test reads"
+      - "Won Best Use of ElevenLabs at the UCSC AI Hackathon 2026"
     narrative: "Team hackathon project; a teammate started the negotiation and Haatim built the distributed A2A runtime, the evaluation, the photo-accuracy work, and extensions to the agents. Say co-built, not designed."
 
   - name: Pathwise -- Autonomous Financial Planning Agent
