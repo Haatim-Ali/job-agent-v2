@@ -22,3 +22,4 @@ main_roles:
     - "roles requiring 3+ years experience"
     - "non-English language requirements"
     - "roles that require the candidate to be currently pursuing a Master's or PhD degree (i.e. Bachelor's students are not eligible) -- this candidate is an undergraduate and does not qualify for graduate-only roles. Note: a role that simply lists Bachelor's/Master's/PhD as alternative acceptable degrees is FINE and should not be disqualified."
+    - "roles whose eligibility window excludes a student graduating in March 2028 -- e.g. a required graduation date of 2026 or 2027 (before March 2028), 'final-year students graduating by Dec 2027', 'new grads / recent graduates only', or a degree already completed. Roles that accept 2028 graduates, rising juniors or rising seniors, or that state no graduation requirement are FINE. If the stated window is ambiguous, do not disqualify; lower the fit_score instead."

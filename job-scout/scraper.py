@@ -43,6 +43,29 @@ EXPERIENCE_FILTER_RE = re.compile(
     re.IGNORECASE
 )
 
+# Hard filter: graduate-only internships ("must be currently pursuing a Master's or PhD").
+# Backstop for Claude; a posting that also names Bachelor's/undergrad students nearby is kept.
+_GRAD_DEGREE = r"(?:master'?s|m\.?s\.?|ph\.?\s?d\.?|doctoral|doctorate|graduate)(?:\s+(?:degree|program|student))?"
+GRAD_ONLY_RE = re.compile(
+    r"(?:currently|actively)\s+(?:be\s+)?(?:enrolled|pursuing|working\s+towards?)\s+(?:in\s+)?(?:an?\s+)?"
+    + _GRAD_DEGREE + r"\b"
+    + r"|(?:must|should)\s+be\s+(?:an?\s+)?(?:current\s+)?(?:master'?s|ph\.?\s?d\.?|graduate)\s+(?:degree\s+)?students?"
+    + r"|(?:open|available)\s+(?:only\s+)?to\s+(?:current\s+)?(?:master'?s|ph\.?\s?d\.?|graduate)\s+students?(?:\s+only)?",
+    re.IGNORECASE,
+)
+_UNDERGRAD_OK_RE = re.compile(r"bachelor|undergrad|\bb\.?s\.?\b|\bb\.?a\.?\b", re.IGNORECASE)
+
+
+def requires_grad_degree(desc):
+    """True if the description restricts the role to Master's/PhD students. A match with
+    Bachelor's/undergrad mentioned within 80 characters ("pursuing a Bachelor's, Master's or
+    PhD") is an alternative-degree list, not a restriction."""
+    for m in GRAD_ONLY_RE.finditer(desc):
+        window = desc[max(0, m.start() - 80): m.end() + 80]
+        if not _UNDERGRAD_OK_RE.search(window):
+            return True
+    return False
+
 logging.basicConfig(
     filename="/var/log/jobscraper.log",
     level=logging.INFO,
@@ -665,6 +688,10 @@ def process_jobs(jobs, conn, is_remote=False, from_career_site=False):
         desc_text = str(job_dict.get("description") or "")
         if desc_text and EXPERIENCE_FILTER_RE.search(desc_text):
             logging.info(f"Experience filtered: {job_dict.get('title')} @ {job_dict.get('company')} -- 5+ years requirement found")
+            mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
+            continue
+        if desc_text and requires_grad_degree(desc_text) and not job_dict.get("watched"):
+            logging.info(f"Degree filtered: {job_dict.get('title')} @ {job_dict.get('company')} -- Master's/PhD students only")
             mark_seen(conn, job_url, job_dict.get("title"), job_dict.get("company"))
             continue
 

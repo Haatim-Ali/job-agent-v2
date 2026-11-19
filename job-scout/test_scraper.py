@@ -110,6 +110,35 @@ class TestExperienceFilterRe:
 
 # ── quick_filter company exclusion ────────────────────────────────────────────
 
+class TestRequiresGradDegree:
+    """requires_grad_degree drops Master's/PhD-only roles but keeps alternative-degree lists."""
+
+    def setup_method(self):
+        import scraper
+        self.f = scraper.requires_grad_degree
+
+    @pytest.mark.parametrize("text", [
+        "Candidates must be currently pursuing a Master's degree in Computer Science.",
+        "You are currently enrolled in a PhD program in machine learning.",
+        "Must be a current PhD student.",
+        "This internship is open only to graduate students.",
+        "Currently pursuing an M.S. in Statistics or a related field.",
+    ])
+    def test_grad_only_filtered(self, text):
+        assert self.f(text)
+
+    @pytest.mark.parametrize("text", [
+        "Currently pursuing a Bachelor's, Master's or PhD in Computer Science.",
+        "Currently enrolled in an undergraduate or graduate degree program.",
+        "Pursuing a BS/MS in CS, EE or a related field.",
+        "Experience with Python. Master's degree preferred but not required.",
+        "We build tools for graduate admissions offices.",
+        "",
+    ])
+    def test_undergrad_eligible_kept(self, text):
+        assert not self.f(text)
+
+
 class TestQuickFilterExcludeCompanies:
     """jobright.ai reposts jobs under its own name rather than as the hiring
     employer -- these are excluded regardless of title/description content."""

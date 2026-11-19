@@ -353,7 +353,9 @@ flowchart LR
   C -->|pass| D[LinkedIn only:<br/>fetch full page]
   D --> E{Description says<br/>5+ years?}
   E -->|yes| X3[mark seen]
-  E -->|no| F{Same title + company<br/>in last 7 days?}
+  E -->|no| E2{Master's/PhD<br/>students only?}
+  E2 -->|yes| X3
+  E2 -->|no| F{Same title + company<br/>in last 7 days?}
   F -->|yes, not a repost| X4[mark seen]
   F -->|no| G{LinkedIn only:<br/>under 2 hours old OR<br/>under 10 applicants?}
   G -->|no| X5[mark seen]
@@ -404,6 +406,10 @@ Reading the first one piece by piece:
 
 It catches "5+ years of experience," "minimum of 7 years" and "10+ yrs," and ignores "1-3 years" and "a 5-year roadmap." The `re.IGNORECASE` flag makes it case-insensitive.
 
+### 4b. Graduate-only filter (since 2026-11-19)
+
+`requires_grad_degree` drops roles restricted to Master's/PhD students before Claude sees them, as a free backstop to the profile's grad-only disqualifier. `GRAD_ONLY_RE` matches three phrasings: "currently pursuing/enrolled in a Master's/M.S./PhD/graduate program," "must be a current PhD student," and "open only to graduate students." A match is ignored when "Bachelor's," "undergrad," "BS" or "BA" appears within 80 characters, so "currently pursuing a Bachelor's, Master's or PhD" is kept; so is "Master's preferred." Watched-company internships skip it (they always alert). Logged as "Degree filtered."
+
 ### 5. Duplicates and reposts
 
 - **7-day same-role check.** `is_repost_by_title` compares the job with everything from the same company seen in the last 7 days, by **meaning, not exact wording**: `title_key` reduces a title to its core words (order-free, with years, "intern", filler and punctuation dropped), so "2027 Summer Intern – Machine Learning Engineer, AV/AI Platform" (LinkedIn) and "Machine Learning Engineer Intern - AV/AI Platform" (Simplify) count as one job. Seasons are kept apart: a Spring and a Summer program are two jobs, but a title with no season matches either. Company names ignore punctuation ("Rhoda AI" = "Rhoda-Ai"). Until 2026-10-04 this check required identical titles, and 10 of the 120 alerts since Oct 1 were duplicates (General Motors' 4 internships each came twice).
@@ -431,7 +437,7 @@ Only survivors of every free check reach Claude. The model is **Claude Haiku 4.5
 
 The **prompt** is the text sent to the model. It's assembled from:
 
-1. Your profile from `candidate_profile.yaml`: name, background, target roles, industries, locations, $25/hr minimum pay, experience level ("undergraduate … NOT enrolled in or pursuing a Master's or PhD"), and the **disqualifiers** (3+ years' experience, non-English language requirements, grad-student-only roles, with a note that "Bachelor's/Master's/PhD" listed as alternatives is fine).
+1. Your profile from `candidate_profile.yaml`: name, background, target roles, industries, locations, $25/hr minimum pay, experience level ("undergraduate … NOT enrolled in or pursuing a Master's or PhD"), and the **disqualifiers** (3+ years' experience, non-English language requirements, grad-student-only roles, with a note that "Bachelor's/Master's/PhD" listed as alternatives is fine, and, since 2026-11-19, roles whose graduation window excludes a March 2028 graduate: a required graduation in 2026 or 2027, new grads only, or a finished degree; 2028 grads, rising juniors/seniors and no stated window are fine, and an ambiguous window lowers the score instead of rejecting).
 2. **Rejection context**: your 15 most recent ❌ dismissal reasons from the `rejections` table (see "The feedback loop").
 3. The job: title, company, location, and the first 3,500 characters of the description.
 4. A **JSON schema** describing the reply (`SCORE_SCHEMA`):
@@ -1087,6 +1093,8 @@ Run them with `venv/bin/python -m pytest -q --ignore=test_discord.py --ignore=te
 **WebSocket.** A long-lived, two-way network connection, used for real-time events.
 
 # Changelog
+
+**2026-11-19: degree and graduation-date filtering.** Haatim asked how the bot keeps out Master's-only and wrong-class-year roles; the Master's check was Claude-only and nothing checked graduation dates. Added the graduate-only regex filter (`requires_grad_degree`, step 4b of the funnel) and a fourth disqualifier in `candidate_profile.yaml` for roles whose graduation window excludes March 2028. 11 tests added.
 
 **2026-11-11: 💀 concerns.** Reacting 💀 to an alert (or a tailored-files message) opens a thread in a new #concerns channel (`CONCERNS_CHANNEL_ID`) where Haatim types a problem or improvement for that posting or the bot. Notes are stored in two new tables via `concerns.py`; `!resolve <note>` closes a thread, `!concerns` lists open ones, and `python concerns.py` prints them for a fix session. No API cost. The alert footer lists 💀. Tests: `test_concerns.py` (store) and `test_bot_concerns.py` (thread handling, needs discord.py).
 
